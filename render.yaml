@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: quiniela-predictor
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: OPEN_BROWSER
+        value: "0"
+      - key: APP_PASSWORD
+        value: quini1236

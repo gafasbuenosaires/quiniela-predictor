@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiniela Predictor</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="loginGate" class="login-gate hidden">
+    <form id="loginForm" class="login-card">
+      <p class="login-tag">Acceso privado</p>
+      <h2>Quiniela Predictor</h2>
+      <p class="login-hint">Ingresa la clave para continuar.</p>
+      <input id="loginPassword" type="password" placeholder="Clave" autocomplete="current-password" required />
+      <p id="loginError" class="login-error hidden">Clave incorrecta</p>
+      <button type="submit" class="btn primary">Entrar</button>
+    </form>
+  </div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Quiniela</h1>
+      <p>Predictor</p>
+    </div>
+    <nav id="provinceNav" class="province-nav"></nav>
+    <div class="sidebar-footer">
+      <p id="liveClock">--:--:--</p>
+      <p id="lastUpdate" class="muted">Actualizando...</p>
+    </div>
+  </aside>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <div>
+        <h2 id="viewTitle">Vista general</h2>
+        <p id="viewSubtitle" class="subtitle">Todas las provincias</p>
+      </div>
+      <div class="topbar-actions">
+        <span id="syncStatus" class="badge">Conectando...</span>
+        <label class="auto-label">
+          <input type="checkbox" id="autoRefresh" checked /> Auto
+        </label>
+        <button id="btnSync" class="btn primary">Sincronizar</button>
+      </div>
+    </header>
+
+    <div id="drawResultsBar" class="draw-results-bar" aria-live="polite"></div>
+
+    <main id="viewOverview" class="view active">
+      <section id="overviewMega" class="mega-pick-banner hidden"></section>
+      <section class="overview-grid" id="overviewGrid"></section>
+    </main>
+
+    <main id="viewDetail" class="view">
+      <section class="card hero expert-hero mega-pick-panel">
+        <p class="mega-tag">Agente · analisis historico</p>
+        <h2 id="playMessage" class="jugar-este">JUGA ESTE</h2>
+        <p id="playCallout" class="play-callout">Terminacion —</p>
+        <div id="nextDrawName" class="hero-draw">-</div>
+        <p id="nextDrawCountdown" class="next-countdown"></p>
+
+        <div class="antes-vs-pick">
+          <div class="antes-block">
+            <span id="antesLabel" class="antes-label">Ultimas La Primera (premio 1)</span>
+            <div id="pastDigits" class="past-digits"></div>
+          </div>
+          <div class="arrow-pick" aria-hidden="true">→</div>
+          <div class="pick-block">
+            <span class="pick-label">Proximo</span>
+            <div id="expertDigit" class="mega-digit">?</div>
+          </div>
+        </div>
+
+        <div id="agentSays" class="agent-says">Analizando historial por dia, semana y mes...</div>
+        <p class="sub-picks muted-inline">Referencia: stats 30d <strong id="mainDigit">-</strong><span id="mainProb"></span> · IA 5d <strong id="aiDigit">-</strong><span id="aiConf"></span></p>
+      </section>
+
+      <section class="card wide schedule-panel">
+        <h3 class="four-title">Horarios de las 4 quinielas</h3>
+        <p id="scheduleSubtitle" class="schedule-subtitle"></p>
+        <div id="drawSchedule" class="draw-schedule-grid"></div>
+      </section>
+
+      <section class="card wide four-draws-panel">
+        <h3 class="four-title">Las 4 quinielas del dia — JUGA ESTE + probabilidad</h3>
+        <p id="fourDayDate" class="four-date"></p>
+        <div id="fourDrawsGrid" class="four-draws-grid"></div>
+      </section>
+
+      <section class="card wide cross-draw-panel">
+        <h3 class="four-title">Estadistica cruzada — entre las 4 quinielas</h3>
+        <p id="crossAgent" class="agent-says"></p>
+        <div class="cross-consensus">
+          <span class="jugar-mini-title">JUGA ESTE (consenso 4 quinielas)</span>
+          <div id="crossDigit" class="mega-digit cross-digit">?</div>
+          <p id="crossProb" class="prob-line"></p>
+        </div>
+        <div id="crossBars" class="bars"></div>
+        <div id="crossCompare" class="cross-compare-grid"></div>
+        <div id="crossToday" class="cross-today"></div>
+      </section>
+
+      <div class="detail-grid">
+        <section class="card wide verify-card">
+          <h3>Ultimo dia cargado — verificacion</h3>
+          <p id="verifyNote" class="verify-note"></p>
+          <div id="verifyDay" class="verify-grid"></div>
+        </section>
+        <section class="card wide highlight">
+          <h3>Analisis experto (dia vs mes + secuencias)</h3>
+          <p id="precisionVerdict" class="precision-verdict"></p>
+          <div id="precisionTable" class="precision-table"></div>
+          <ul id="expertReasons" class="reasoning expert-reasons"></ul>
+          <p id="expertDisclaimer" class="disclaimer-sm"></p>
+        </section>
+        <section class="card">
+          <h3>Secuencia reciente</h3>
+          <p id="sequenceScope" class="sequence-scope"></p>
+          <p id="sequenceText" class="sequence-chain"></p>
+          <div id="sequenceList" class="sequence-list"></div>
+        </section>
+        <section class="card">
+          <h3>Monitoreo</h3>
+          <div id="recentList" class="recent-list"></div>
+        </section>
+        <section class="card">
+          <h3>Matematica 30d</h3>
+          <div id="mathBars" class="bars"></div>
+          <ol id="mathRanking" class="ranking"></ol>
+        </section>
+        <section class="card">
+          <h3>Agente IA 5d</h3>
+          <ul id="aiReasoning" class="reasoning"></ul>
+          <pre id="aiContext" class="context collapsed"></pre>
+          <button type="button" class="btn ghost sm" id="toggleContext">Detalle</button>
+        </section>
+        <section class="card">
+          <h3>Por horario</h3>
+          <div id="perDraw" class="per-draw"></div>
+        </section>
+        <section class="card">
+          <h3>Martingala x7</h3>
+          <div class="martingale-controls">
+            <label>Base $<input type="number" id="baseBet" value="100" min="1" /></label>
+            <label>Intentos <input type="number" id="maxAttempts" value="4" min="1" max="8" /></label>
+          </div>
+          <table id="martingaleTable" class="data-table"></table>
+        </section>
+        <section class="card wide">
+          <h3>Stats 30 dias (4 quinielas · premio #1)</h3>
+          <div id="stats30" class="stats-grid"></div>
+        </section>
+      </div>
+    </main>
+
+    <main id="viewCaja" class="view">
+      <section class="caja-hero">
+        <div class="caja-hero-text">
+          <p class="caja-tag">4 sorteos del dia · Nacional y Provincia</p>
+          <h2 class="caja-title">Caja de apuestas</h2>
+          <p id="cajaRule" class="caja-rule"></p>
+          <div id="cajaSessionStatus" class="caja-session-status"></div>
+          <p class="caja-sync-note">Auto-actualiza 5 min despues de cada sorteo. Sesion desde el 22/05 (arrancamos en Matutina).</p>
+        </div>
+        <div class="caja-summary-grid">
+          <article class="caja-stat">
+            <span class="lbl">Invertido</span>
+            <strong id="cajaInvertido">$0</strong>
+          </article>
+          <article class="caja-stat">
+            <span class="lbl">Ganado</span>
+            <strong id="cajaGanado" class="win">$0</strong>
+          </article>
+          <article class="caja-stat">
+            <span class="lbl">Neto</span>
+            <strong id="cajaNeto">$0</strong>
+          </article>
+          <article class="caja-stat highlight">
+            <span class="lbl">Caja</span>
+            <strong id="cajaSaldo">$0</strong>
+          </article>
+        </div>
+      </section>
+
+      <div id="cajaActiveBets" class="caja-bets-grid"></div>
+
+      <section class="card wide caja-settings collapsed-panel">
+        <button type="button" class="caja-settings-toggle" id="toggleCajaSettings">Configuracion avanzada</button>
+        <div id="cajaSettingsBody" class="caja-settings-body hidden">
+          <div class="caja-settings-row">
+            <label>Saldo inicial $<input type="number" id="cajaInitial" min="0" step="1000" /></label>
+            <label>Apuesta base $<input type="number" id="cajaDefaultStake" min="1" step="1000" /></label>
+            <label>Pago x<input type="number" id="cajaMultiplier" min="1" max="20" step="0.5" /></label>
+            <label>Doblar cada <input type="number" id="cajaDoubleAfter" min="1" max="20" /> fallos</label>
+            <button type="button" class="btn ghost sm" id="btnSaveCajaSettings">Guardar</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card wide caja-ledger-panel">
+        <div class="caja-toolbar">
+          <h3>Movimientos — todos los sorteos</h3>
+          <button type="button" class="btn primary sm" id="btnProcessCaja">Procesar sorteos</button>
+        </div>
+        <p id="cajaLedgerStats" class="muted"></p>
+        <div class="caja-ledger-wrap">
+          <table class="data-table caja-ledger">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Quiniela</th>
+                <th>Provincia</th>
+                <th>Jugado</th>
+                <th>Salio</th>
+                <th>Apuesta</th>
+                <th>Resultado</th>
+                <th>Cobro</th>
+              </tr>
+            </thead>
+            <tbody id="cajaLedgerBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Datos: quini-6-resultados.com.ar (no oficial) | Juego responsable
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
