@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 APP_PASSWORD = os.getenv("APP_PASSWORD", "").strip()
 PUBLIC_PATHS = {"/health"}
+PUBLIC_PREFIXES = ("/static/", "/assets/")
 
 
 def password_required() -> bool:
@@ -18,6 +19,8 @@ def check_password(request: Request) -> bool:
     if not password_required():
         return True
     if request.url.path in PUBLIC_PATHS:
+        return True
+    if any(request.url.path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
         return True
     if request.url.path == "/api/config" and request.method == "GET":
         return True

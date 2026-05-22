@@ -176,6 +176,7 @@ function authHeaders() {
 }
 
 function showLogin(message = "") {
+  hideAppShell();
   const gate = $("loginGate");
   const err = $("loginError");
   if (gate) gate.classList.remove("hidden");
@@ -188,6 +189,14 @@ function showLogin(message = "") {
 function hideLogin() {
   $("loginGate")?.classList.add("hidden");
   $("loginError")?.classList.add("hidden");
+}
+
+function showAppShell() {
+  $("appShell")?.classList.add("ready");
+}
+
+function hideAppShell() {
+  $("appShell")?.classList.remove("ready");
 }
 
 function setupLogin() {
@@ -993,6 +1002,8 @@ function startTimers() {
 }
 
 async function bootApp(preloadedConfig = null) {
+  showAppShell();
+  hideLogin();
   tickClock();
   setInterval(tickClock, 1000);
   config = preloadedConfig || (await fetchJson("/api/config"));

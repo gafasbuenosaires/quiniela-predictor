@@ -4,7 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quiniela Predictor</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #080b10; color: #e8edf5; font-family: "DM Sans", system-ui, sans-serif; }
+    .hidden { display: none !important; }
+    #appShell { display: none; flex: 1; width: 100%; min-height: 100vh; }
+    #appShell.ready { display: flex; }
+    body { display: flex; min-height: 100vh; }
+    .login-gate { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(8, 12, 18, 0.96); }
+    .login-gate.hidden { display: none !important; }
+    .login-card { width: min(360px, 92vw); padding: 2rem; border-radius: 16px; border: 1px solid #243044; background: #141b26; display: flex; flex-direction: column; gap: 0.85rem; }
+    .login-card input { padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid #243044; background: #080b10; color: #e8edf5; font-size: 1rem; }
+    .login-error { margin: 0; color: #f87171; font-size: 0.82rem; }
+    .btn.primary { padding: 0.65rem 1rem; border: 0; border-radius: 10px; background: #3dd68c; color: #04140c; font-weight: 700; cursor: pointer; }
+  </style>
+  <link rel="preload" href="/assets/styles.css?v=2" as="style" />
+  <link rel="stylesheet" href="/assets/styles.css?v=2" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
 </head>
 <body>
@@ -19,6 +33,7 @@
     </form>
   </div>
 
+  <div id="appShell">
   <aside class="sidebar">
     <div class="brand">
       <h1>Quiniela</h1>
@@ -229,7 +244,8 @@
       Datos: quini-6-resultados.com.ar (no oficial) | Juego responsable
     </footer>
   </div>
+  </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/assets/app.js?v=2"></script>
 </body>
 </html>

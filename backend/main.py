@@ -136,6 +136,16 @@ def index():
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
+@app.get("/assets/styles.css")
+def asset_styles():
+    return FileResponse(FRONTEND_DIR / "styles.css", media_type="text/css")
+
+
+@app.get("/assets/app.js")
+def asset_app_js():
+    return FileResponse(FRONTEND_DIR / "app.js", media_type="application/javascript")
+
+
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
