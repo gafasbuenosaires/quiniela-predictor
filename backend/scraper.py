@@ -37,7 +37,7 @@ def _client() -> httpx.Client:
             "User-Agent": USER_AGENT,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
             "Sec-Fetch-Dest": "document",
