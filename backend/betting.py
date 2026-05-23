@@ -94,6 +94,41 @@ def _province_label(pid: str) -> str:
     return PROVINCES.get(pid, {}).get("name", pid)
 
 
+def _ensure_today_draws() -> None:
+    """Fusiona seed si faltan sorteos de hoy (Render pierde DB al redeploy)."""
+    today = datetime.now().date().isoformat()
+    now = datetime.now()
+    past_slots = [
+        slot
+        for slot in DRAW_TIMES
+        if now >= datetime(now.year, now.month, now.day, slot["hour"], slot.get("minute", 0))
+    ]
+    if not past_slots:
+        return
+    missing = False
+    for slot in past_slots:
+        for pid in CAJA_PROVINCES:
+            row = next(
+                (
+                    d
+                    for d in get_draws(province=pid, from_date=today)
+                    if d["draw_date"] == today
+                    and d["draw_type"] == slot["id"]
+                    and d["position"] == 1
+                ),
+                None,
+            )
+            if not row:
+                missing = True
+                break
+        if missing:
+            break
+    if missing:
+        from backend.seed.loader import merge_seed_draws
+
+        merge_seed_draws()
+
+
 def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]:
     """Movimientos del sabado en el mismo formato del ledger — sin apostar ni sumar."""
     items: list[dict[str, Any]] = []
@@ -447,6 +482,7 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
     process_new_results()
     today = datetime.now().date().isoformat()
     rest_today = is_today_rest_day()
+    _ensure_today_draws()
     real_entries = get_betting_entries_filtered(
         provinces=CAJA_PROVINCES,
         limit=limit,
