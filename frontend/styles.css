@@ -1013,6 +1013,41 @@ body {
 .caja-ledger .hit-row { background: rgba(61, 214, 140, 0.1); }
 .caja-ledger .win { color: var(--accent); font-weight: 600; }
 
+.caja-rest-banner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #f0b42955;
+  background: rgba(240, 180, 41, 0.12);
+  color: #f0d890;
+  font-size: 0.9rem;
+}
+.caja-rest-banner.hidden { display: none; }
+.caja-bet-card.rest-day { border-color: #f0b42955; opacity: 0.95; }
+.caja-rest-msg { margin: 0.5rem 0; color: #f0b429; font-weight: 600; }
+.caja-rest-next { margin: 0; font-size: 0.85rem; }
+.rest-tag { color: #f0b429 !important; font-weight: 700; }
+.caja-monitor-panel.hidden { display: none; }
+.caja-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+.caja-monitor-chip {
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+}
+.cm-draw { color: var(--muted); }
+.cm-prov { font-weight: 600; }
+.cm-res { font-size: 1rem; }
+
 .login-gate {
   position: fixed;
   inset: 0;

@@ -72,3 +72,6 @@ CAJA_SESSION_NACIONAL_START = CAJA_SESSION_START
 CAJA_SESSION_NACIONAL_PREV_DIGIT = 2
 CAJA_SESSION_PROVINCIA_DIGIT = 5
 CAJA_SESSION_PROVINCIA_START = CAJA_SESSION_START
+
+# Sabado = descanso: monitorear sorteos pero no contabilizar apuestas
+CAJA_REST_WEEKDAYS = [5]  # 0=lunes .. 6=domingo (datetime.weekday: 0=lun, 5=sab)

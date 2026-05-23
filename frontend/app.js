@@ -243,6 +243,17 @@ function renderActiveBets(bets) {
   }
   wrap.innerHTML = bets
     .map((b) => {
+      if (b.rest_day) {
+        return `
+      <article class="caja-bet-card rest-day">
+        <header class="caja-bet-head">
+          <span class="caja-bet-prov">${b.province_label}</span>
+          <span class="caja-bet-draw rest-tag">Sin jugar</span>
+        </header>
+        <p class="caja-rest-msg">${b.rest_message || "Sabado de descanso — solo monitoreo"}</p>
+        <p class="caja-rest-next muted">Proximo numero: <strong style="color:${DIGIT_COLORS[b.active_digit]}">${b.active_digit}</strong> · racha ${b.loss_streak}/${b.double_threshold || 6} (congelada)</p>
+      </article>`;
+      }
       const color = DIGIT_COLORS[b.active_digit] || "#3dd68c";
       const threshold = b.double_threshold || 6;
       const pctStreak = Math.min(100, (b.loss_streak / threshold) * 100);
@@ -300,8 +311,51 @@ async function saveSingleBet(province, drawType, card) {
   await loadCaja();
 }
 
+function renderCajaMonitor(monitor) {
+  const panel = $("cajaSaturdayMonitor");
+  if (!panel) return;
+  if (!monitor?.length) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+    return;
+  }
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <h3>Monitoreo sabado — sin apostar</h3>
+    <p class="muted">Los sorteos se siguen aca pero no suman en la caja.</p>
+    <div class="caja-monitor-grid">
+      ${monitor
+        .map((m) => {
+          const digit = m.result_digit;
+          const color = digit != null ? DIGIT_COLORS[digit] : "#8b9bb4";
+          const result =
+            digit != null
+              ? `<strong style="color:${color}">${digit}</strong> <span class="muted">(${m.result_number})</span>`
+              : `<span class="muted">Pendiente</span>`;
+          return `
+        <article class="caja-monitor-chip">
+          <span class="cm-draw">${m.draw_name} · ${m.draw_time}</span>
+          <span class="cm-prov">${m.province_label}</span>
+          <span class="cm-res">Salio: ${result}</span>
+        </article>`;
+        })
+        .join("")}
+    </div>`;
+}
+
 function renderCaja(state) {
   const c = state.caja || {};
+  const restDay = state.session?.rest_day;
+  const banner = $("cajaRestBanner");
+  if (banner) {
+    if (restDay) {
+      banner.classList.remove("hidden");
+      banner.textContent = "Sabado — dia de descanso del apostador. Monitoreamos los sorteos pero no se juega ni cuenta en la caja.";
+    } else {
+      banner.classList.add("hidden");
+    }
+  }
+  renderCajaMonitor(restDay ? state.session?.monitor : []);
   $("cajaInvertido").textContent = money(c.invertido);
   $("cajaGanado").textContent = money(c.ganado);
   $("cajaNeto").textContent = money(c.neto);

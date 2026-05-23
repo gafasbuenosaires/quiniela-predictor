@@ -537,6 +537,25 @@ def purge_betting_entries_excluded_draws(
         return cur.rowcount
 
 
+def purge_betting_entries_on_weekdays(
+    weekdays: list[int],
+    provinces: list[str] | None = None,
+) -> int:
+    """weekdays en formato Python datetime.weekday (0=lunes, 5=sabado)."""
+    if not weekdays:
+        return 0
+    sqlite_days = {str((d + 1) % 7) for d in weekdays}
+    placeholders = ",".join("?" * len(sqlite_days))
+    query = f"DELETE FROM betting_entries WHERE strftime('%w', draw_date) IN ({placeholders})"
+    params: list[Any] = list(sqlite_days)
+    if provinces:
+        query += f" AND province IN ({','.join('?' * len(provinces))})"
+        params.extend(provinces)
+    with get_conn() as conn:
+        cur = conn.execute(query, params)
+        return cur.rowcount
+
+
 def get_betting_entries_filtered(
     *,
     provinces: list[str] | None = None,

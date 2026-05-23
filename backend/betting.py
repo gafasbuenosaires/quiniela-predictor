@@ -10,6 +10,7 @@ from backend.config import (
     CAJA_DOUBLE_AFTER_LOSSES,
     CAJA_DRAW,
     CAJA_PROVINCES,
+    CAJA_REST_WEEKDAYS,
     CAJA_SESSION_NACIONAL_PREV_DIGIT,
     CAJA_SESSION_NACIONAL_START,
     CAJA_SESSION_PROVINCIA_DIGIT,
@@ -32,6 +33,7 @@ from backend.database import (
     insert_betting_entry,
     purge_betting_entries_before_session,
     purge_betting_entries_excluded_draws,
+    purge_betting_entries_on_weekdays,
     upsert_betting_settings,
     upsert_betting_slot,
 )
@@ -41,7 +43,17 @@ DRAW_ORDER = {d["id"]: i for i, d in enumerate(DRAW_TIMES)}
 CAJA_DRAW_ORDER = DRAW_ORDER.get(CAJA_DRAW, 1)
 
 
+def is_rest_day(draw_date: str) -> bool:
+    return datetime.fromisoformat(draw_date).weekday() in CAJA_REST_WEEKDAYS
+
+
+def is_today_rest_day() -> bool:
+    return datetime.now().date().weekday() in CAJA_REST_WEEKDAYS
+
+
 def _should_process_draw(draw_date: str, draw_type: str) -> bool:
+    if is_rest_day(draw_date):
+        return False
     if draw_date < CAJA_SESSION_START:
         return False
     if draw_date == CAJA_SESSION_START:
@@ -80,6 +92,36 @@ def _province_label(pid: str) -> str:
     if pid == "buenos_aires":
         return "Provincia"
     return PROVINCES.get(pid, {}).get("name", pid)
+
+
+def _rest_day_monitoring(today: str) -> list[dict[str, Any]]:
+    """Sorteos del dia solo para mirar — sin apostar."""
+    items: list[dict[str, Any]] = []
+    for slot in DRAW_TIMES:
+        for pid in CAJA_PROVINCES:
+            row = next(
+                (
+                    d
+                    for d in get_draws(province=pid, from_date=today)
+                    if d["draw_date"] == today
+                    and d["draw_type"] == slot["id"]
+                    and d["position"] == 1
+                ),
+                None,
+            )
+            items.append(
+                {
+                    "draw_type": slot["id"],
+                    "draw_name": slot["name"],
+                    "draw_time": f"{slot['hour']:02d}:{slot.get('minute', 0):02d} hs",
+                    "province": pid,
+                    "province_label": _province_label(pid),
+                    "result_digit": int(row["last_digit"]) if row else None,
+                    "result_number": row["number"] if row else None,
+                    "has_result": row is not None,
+                }
+            )
+    return items
 
 
 def _replay_province_state(pid: str, entries: list[dict] | None = None) -> dict[str, float | int]:
@@ -299,6 +341,12 @@ def rebuild_session_ledger() -> dict[str, Any]:
 
 
 def _session_status() -> dict[str, str]:
+    if is_today_rest_day():
+        return {
+            "headline": "Sabado — dia de descanso del apostador (solo monitoreo, sin jugar)",
+            "nacional": "Nacional: sin apostar hoy · seguimos con el 3 el lunes",
+            "provincia": "Provincia: sin apostar hoy · seguimos con el 5 el lunes",
+        }
     return {
         "headline": "Jugando el 3 (Nacional) y el 5 (Provincia) en los 4 sorteos del dia",
         "nacional": "Nacional: 3 en cada sorteo · ganamos con el 2 en Matutina el 22/05",
@@ -312,6 +360,7 @@ def _active_bets() -> list[dict[str, Any]]:
     settings = get_settings()
     entries = get_betting_entries_filtered(provinces=CAJA_PROVINCES, limit=500)
     bets: list[dict[str, Any]] = []
+    rest_today = is_today_rest_day()
 
     for pid in CAJA_PROVINCES:
         next_sid = get_next_draw(province=pid)["next_draw"]
@@ -335,7 +384,9 @@ def _active_bets() -> list[dict[str, Any]]:
                 "double_threshold": threshold,
                 "next_stake_if_double": stake * 2,
                 "potential_win": round(stake * settings["payout_multiplier"], 2),
-                "enabled": True,
+                "enabled": not rest_today,
+                "rest_day": rest_today,
+                "rest_message": "Sin jugar — sabado de descanso" if rest_today else "",
             }
         )
     return bets
@@ -359,7 +410,8 @@ def _purge_invalid_caja_entries() -> int:
     excluded = [dt for dt, idx in DRAW_ORDER.items() if idx < CAJA_DRAW_ORDER]
     n1 = purge_betting_entries_before_session(CAJA_SESSION_START, CAJA_PROVINCES)
     n2 = purge_betting_entries_excluded_draws(CAJA_SESSION_START, excluded, CAJA_PROVINCES)
-    return n1 + n2
+    n3 = purge_betting_entries_on_weekdays(CAJA_REST_WEEKDAYS, CAJA_PROVINCES)
+    return n1 + n2 + n3
 
 
 def get_caja_state(limit: int = 50) -> dict[str, Any]:
@@ -393,6 +445,8 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             by_province[p][k] = round(by_province[p][k], 2)
 
     draw = DRAW_INFO.get(CAJA_DRAW, DRAW_TIMES[1])
+    today = datetime.now().date().isoformat()
+    rest_today = is_today_rest_day()
     return {
         "settings": settings,
         "session": {
@@ -402,6 +456,8 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             "provinces": [_province_label(p) for p in CAJA_PROVINCES],
             "rule": f"Sesion desde el {CAJA_SESSION_START} · sync auto 5 min despues de cada sorteo",
             "status": _session_status(),
+            "rest_day": rest_today,
+            "monitor": _rest_day_monitoring(today) if rest_today else [],
         },
         "caja": {
             **totals,
