@@ -474,6 +474,7 @@ def disable_betting_slots_except(active_keys: set[str]) -> None:
 def clear_betting_entries(
     provinces: list[str] | None = None,
     draw_type: str | None = None,
+    from_date: str | None = None,
 ) -> int:
     query = "DELETE FROM betting_entries WHERE 1=1"
     params: list[Any] = []
@@ -483,6 +484,9 @@ def clear_betting_entries(
     if draw_type:
         query += " AND draw_type = ?"
         params.append(draw_type)
+    if from_date:
+        query += " AND draw_date >= ?"
+        params.append(from_date)
     with get_conn() as conn:
         cur = conn.execute(query, params)
         return cur.rowcount

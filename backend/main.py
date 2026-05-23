@@ -73,11 +73,6 @@ async def lifespan(app: FastAPI):
     if not get_draws(province=DEFAULT_PROVINCE):
         sync_all_provinces(HISTORY_DAYS)
     ensure_draws()
-    if IS_PRODUCTION:
-        try:
-            process_new_results()
-        except Exception:
-            pass
     scheduler.add_job(_scheduled_sync, "interval", minutes=1, id="post_draw_sync")
     scheduler.add_job(
         _scheduled_interval_sync, "interval", minutes=AUTO_REFRESH_MINUTES, id="sync"

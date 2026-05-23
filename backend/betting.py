@@ -162,11 +162,31 @@ def apply_session_bets(reset_streak: bool = False) -> None:
     upsert_betting_settings({**settings, "auto_advance": False, "default_stake": CAJA_DEFAULT_STAKE})
 
 
+def _needs_session_rebuild(entries: list[dict]) -> bool:
+    """Matutina 22/05: Nacional jugo el 2 y gano; si el ledger dice otra cosa, reconstruir."""
+    mat_nac = next(
+        (
+            e
+            for e in entries
+            if e["province"] == "nacional"
+            and e["draw_type"] == CAJA_DRAW
+            and e["draw_date"] == CAJA_SESSION_START
+        ),
+        None,
+    )
+    if not mat_nac:
+        return bool(entries)
+    return (
+        int(mat_nac["digit_played"]) != CAJA_SESSION_NACIONAL_PREV_DIGIT
+        or not mat_nac["hit"]
+    )
+
+
 def rebuild_session_ledger() -> dict[str, Any]:
     """Reconstruye movimientos desde inicio sesion Matutina (Nacional 2→3, Provincia 5)."""
     settings = get_settings()
     threshold = int(settings.get("double_after_losses", CAJA_DOUBLE_AFTER_LOSSES))
-    clear_betting_entries(provinces=CAJA_PROVINCES, draw_type=CAJA_DRAW)
+    clear_betting_entries(provinces=CAJA_PROVINCES, from_date=CAJA_SESSION_START)
     now = datetime.now().isoformat(timespec="seconds")
 
     prov_streak = 0
@@ -350,7 +370,7 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
         provinces=CAJA_PROVINCES,
         limit=limit,
     )
-    if not entries:
+    if not entries or _needs_session_rebuild(entries):
         rebuild_session_ledger()
     process_new_results()
     entries = get_betting_entries_filtered(
@@ -453,6 +473,9 @@ def process_new_results() -> dict[str, Any]:
             draw_type = row["draw_type"]
             key = f"{pid}|{draw_type}|{draw_date}"
             if key in processed:
+                continue
+            # Matutina inicial la arma rebuild_session_ledger (Nacional 2, no 3).
+            if draw_date == CAJA_SESSION_START and draw_type == CAJA_DRAW:
                 continue
 
             stake = float(state["stake"])
