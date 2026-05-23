@@ -1030,6 +1030,7 @@ body {
 .caja-ledger tr.rest-day-row { background: #f0b4290d; }
 .caja-ledger tr.rest-day-row td { color: #c9d4e3; }
 .caja-rest-ledger { color: #f0b429 !important; font-weight: 600; font-style: italic; }
+.pending-result { font-style: italic; font-size: 0.85rem; }
 
 .login-gate {
   position: fixed;

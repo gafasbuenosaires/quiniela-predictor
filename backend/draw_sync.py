@@ -9,13 +9,14 @@ from backend.config import (
     DRAW_TIMES,
     HISTORY_DAYS,
     POST_DRAW_SYNC_MINUTES,
-    POST_DRAW_SYNC_RETRY_MINUTES,
 )
 from backend.database import get_draws, resolve_predictions
 from backend.scraper import sync_all_provinces
 
-# Evita sync duplicado por sorteo/dia en memoria (reinicia al reiniciar server)
+# Sorteos ya resueltos hoy (reinicia al reiniciar server)
 _done_keys: set[str] = set()
+# Ultimo intento de sync por sorteo/dia (reintenta cada POST_DRAW_SYNC_MINUTES)
+_last_sync_attempt: dict[str, datetime] = {}
 
 
 def _draw_datetime(slot: dict, day: datetime) -> datetime:
@@ -36,21 +37,17 @@ def get_draw_sync_status() -> list[dict[str, Any]]:
     for slot in DRAW_TIMES:
         draw_dt = _draw_datetime(slot, now)
         sync_from = draw_dt + timedelta(minutes=POST_DRAW_SYNC_MINUTES)
-        sync_until = draw_dt + timedelta(minutes=POST_DRAW_SYNC_RETRY_MINUTES)
         key = f"{today}|{slot['id']}"
         has_result = _has_draw_result(slot["id"], today)
-        done = key in _done_keys or has_result
 
-        if now < draw_dt:
+        if has_result:
+            phase = "done"
+        elif now < draw_dt:
             phase = "pending"
         elif now < sync_from:
             phase = "waiting_sync"
-        elif now <= sync_until and not done:
-            phase = "syncing"
-        elif has_result:
-            phase = "done"
         else:
-            phase = "missed"
+            phase = "awaiting_result"
 
         result_digit = None
         result_number = None
@@ -101,17 +98,18 @@ def maybe_sync_after_draw(force: bool = False) -> dict[str, Any]:
 
         draw_dt = _draw_datetime(slot, now)
         sync_from = draw_dt + timedelta(minutes=POST_DRAW_SYNC_MINUTES)
-        sync_until = draw_dt + timedelta(minutes=POST_DRAW_SYNC_RETRY_MINUTES)
 
         if now < sync_from and not force:
-            continue
-        if now > sync_until and not force:
-            _done_keys.add(key)
             continue
 
         if _has_draw_result(slot["id"], today):
             _done_keys.add(key)
             continue
+
+        last = _last_sync_attempt.get(key)
+        if not force and last and (now - last).total_seconds() < POST_DRAW_SYNC_MINUTES * 60:
+            continue
+        _last_sync_attempt[key] = now
 
         try:
             sync_all_provinces(HISTORY_DAYS)

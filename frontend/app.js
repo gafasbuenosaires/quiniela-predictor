@@ -229,6 +229,31 @@ function money(n) {
   }).format(Number(n) || 0);
 }
 
+function todayIso() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const PENDING_RESULT_LABEL = "Aún no se sorteó";
+
+function formatSalioCell(digit) {
+  if (digit != null && digit !== "" && String(digit) !== "null") {
+    const d = Number(digit);
+    if (!Number.isNaN(d)) {
+      return `<strong style="color:${DIGIT_COLORS[d]}">${d}</strong>`;
+    }
+  }
+  return `<span class="muted pending-result">${PENDING_RESULT_LABEL}</span>`;
+}
+
+function isRestLedgerEntry(e, restDay) {
+  if (e.rest_day) return true;
+  return Boolean(restDay && e.draw_date === todayIso() && Number(e.stake) === 0);
+}
+
 const PROVINCE_SHORT = {
   nacional: "Nacional",
   buenos_aires: "Provincia",
@@ -372,27 +397,20 @@ function renderCaja(state) {
     ? entries
         .map(
           (e) => {
-            if (e.rest_day) {
+            if (isRestLedgerEntry(e, restDay)) {
               const played = DIGIT_COLORS[e.digit_played] || "#fff";
-              const result =
-                e.result_digit != null
-                  ? `<strong style="color:${DIGIT_COLORS[e.result_digit]}">${e.result_digit}</strong>`
-                  : `<span class="muted">Pendiente</span>`;
               return `
       <tr class="rest-day-row">
         <td>${e.draw_date}</td>
         <td>${DRAW_LABEL[e.draw_type] || e.draw_type}</td>
         <td>${PROVINCE_SHORT[e.province] || e.province}</td>
         <td><strong style="color:${played}">${e.digit_played}</strong></td>
-        <td>${result}</td>
+        <td>${formatSalioCell(e.result_digit)}</td>
         <td class="muted">—</td>
         <td colspan="2" class="caja-rest-ledger">${e.note || "No aposto — dia de descanso"}</td>
       </tr>`;
             }
-            const salio =
-              e.result_digit != null && e.result_digit !== ""
-                ? `<strong style="color:${DIGIT_COLORS[e.result_digit]}">${e.result_digit}</strong>`
-                : `<span class="muted">Pendiente</span>`;
+            const salio = formatSalioCell(e.result_digit);
             return `
       <tr class="${e.hit ? "hit-row" : ""}">
         <td>${e.draw_date}</td>
@@ -413,6 +431,18 @@ function renderCaja(state) {
 async function loadCaja() {
   const state = await fetchJson("/api/caja");
   renderCaja(state);
+  try {
+    await fetchDrawSyncStatus(false);
+    const needsSync = drawSyncStatus.some((s) => !s.has_result && s.phase !== "pending");
+    if (needsSync) {
+      await fetchDrawSyncStatus(true);
+      const refreshed = await fetchJson("/api/caja");
+      renderCaja(refreshed);
+    }
+    renderDrawResultsBar();
+  } catch {
+    /* ignore */
+  }
   setLastUpdate();
 }
 
@@ -981,8 +1011,8 @@ function renderDrawResultsBar() {
         const c = DIGIT_COLORS[s.result_digit] || "#3dd68c";
         return `<span class="dr-chip done">${s.draw_name} <strong style="color:${c}">${s.result_digit}</strong></span>`;
       }
-      if (s.phase === "syncing") {
-        return `<span class="dr-chip syncing">${s.draw_name} · actualizando...</span>`;
+      if (s.phase === "awaiting_result" || s.phase === "syncing") {
+        return `<span class="dr-chip syncing">${s.draw_name} · buscando resultado...</span>`;
       }
       if (s.phase === "waiting_sync") {
         return `<span class="dr-chip wait">${s.draw_name} · sync ${s.sync_at}</span>`;
@@ -1034,7 +1064,7 @@ async function pollDrawSync() {
   try {
     await fetchDrawSyncStatus(false);
     const needsCheck = drawSyncStatus.some(
-      (s) => s.phase === "syncing" || s.phase === "waiting_sync"
+      (s) => !s.has_result && s.phase !== "pending"
     );
     if (needsCheck) {
       const check = await fetchDrawSyncStatus(true);
@@ -1056,9 +1086,10 @@ function startTimers() {
   clearInterval(syncTimer);
   clearInterval(drawSyncTimer);
   const sec = config.poll_seconds || 30;
+  const syncEverySec = config.post_draw_sync_minutes ? config.post_draw_sync_minutes * 60 : 300;
   if ($("autoRefresh").checked) {
     pollTimer = setInterval(refreshCurrent, sec * 1000);
-    drawSyncTimer = setInterval(pollDrawSync, Math.min(30, sec) * 1000);
+    drawSyncTimer = setInterval(pollDrawSync, syncEverySec * 1000);
     syncTimer = setInterval(syncAll, (config.auto_sync_minutes || 15) * 60 * 1000);
   }
 }
