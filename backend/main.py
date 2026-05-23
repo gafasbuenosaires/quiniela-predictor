@@ -40,6 +40,7 @@ from backend.database import (
 from backend.draw_sync import get_draw_sync_status, maybe_sync_after_draw
 from backend.scraper import sync_all_provinces, sync_history
 from backend.auth import auth_middleware, password_required, APP_PASSWORD
+from backend.seed.loader import ensure_draws
 
 load_dotenv()
 
@@ -71,6 +72,12 @@ async def lifespan(app: FastAPI):
     init_db()
     if not get_draws(province=DEFAULT_PROVINCE):
         sync_all_provinces(HISTORY_DAYS)
+    ensure_draws()
+    if IS_PRODUCTION:
+        try:
+            process_new_results()
+        except Exception:
+            pass
     scheduler.add_job(_scheduled_sync, "interval", minutes=1, id="post_draw_sync")
     scheduler.add_job(
         _scheduled_interval_sync, "interval", minutes=AUTO_REFRESH_MINUTES, id="sync"
@@ -163,6 +170,18 @@ def api_sync(
         result = sync_all_provinces(days)
     else:
         result = {"provinces": {province: sync_history(days, province)}}
+    if result.get("total_records_upserted", 0) == 0 and province == "all":
+        seed = ensure_draws()
+        result["seed"] = seed
+    elif province != "all":
+        total = sum(
+            p.get("records_upserted", 0)
+            for p in result.get("provinces", {}).values()
+            if isinstance(p, dict)
+        )
+        if total == 0:
+            seed = ensure_draws()
+            result["seed"] = seed
     resolved = resolve_predictions()
     betting = process_new_results()
     draw_sync = get_draw_sync_status()

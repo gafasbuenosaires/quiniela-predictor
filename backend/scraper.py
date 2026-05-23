@@ -1,4 +1,5 @@
 import re
+import logging
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -13,6 +14,8 @@ from backend.config import (
     USER_AGENT,
 )
 from backend.database import log_sync, upsert_draws
+
+logger = logging.getLogger(__name__)
 
 DRAW_NAME_MAP = {
     "la primera": "primera",
@@ -30,8 +33,19 @@ SORTEO_LINK = re.compile(r"sorteo-(\d{2})-(\d{2})-(\d{4})\.htm", re.I)
 
 def _client() -> httpx.Client:
     return httpx.Client(
-        headers={"User-Agent": USER_AGENT},
-        timeout=30.0,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Cache-Control": "no-cache",
+        },
+        timeout=45.0,
         follow_redirects=True,
     )
 
@@ -153,10 +167,17 @@ def fetch_url(url: str, draw_date: str, province: str, client: httpx.Client) -> 
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        logger.warning("Fetch failed %s: %s", url, exc)
+        return []
+    if len(resp.text) < 500:
+        logger.warning("Fetch too short %s (%s bytes)", url, len(resp.text))
         return []
     parsed_date = _parse_date_from_title(resp.text[:3000], date.fromisoformat(draw_date))
-    return parse_html(resp.text, parsed_date, province)
+    rows = parse_html(resp.text, parsed_date, province)
+    if not rows:
+        logger.warning("No rows parsed from %s", url)
+    return rows
 
 
 def fetch_day(province_id: str, d: date, client: httpx.Client) -> list[dict[str, Any]]:
