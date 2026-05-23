@@ -389,13 +389,17 @@ function renderCaja(state) {
         <td colspan="2" class="caja-rest-ledger">${e.note || "No aposto — dia de descanso"}</td>
       </tr>`;
             }
+            const salio =
+              e.result_digit != null && e.result_digit !== ""
+                ? `<strong style="color:${DIGIT_COLORS[e.result_digit]}">${e.result_digit}</strong>`
+                : `<span class="muted">Pendiente</span>`;
             return `
       <tr class="${e.hit ? "hit-row" : ""}">
         <td>${e.draw_date}</td>
         <td>${DRAW_LABEL[e.draw_type] || e.draw_type}</td>
         <td>${PROVINCE_SHORT[e.province] || e.province}</td>
         <td><strong style="color:${DIGIT_COLORS[e.digit_played]}">${e.digit_played}</strong></td>
-        <td><strong style="color:${DIGIT_COLORS[e.result_digit]}">${e.result_digit}</strong></td>
+        <td>${salio}</td>
         <td>${money(e.stake)}</td>
         <td>${e.hit ? "✓ GANO" : "Perdio"}</td>
         <td class="win">${e.hit ? money(e.payout) : "—"}</td>

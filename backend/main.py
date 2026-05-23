@@ -140,12 +140,16 @@ def index():
 
 @app.get("/assets/styles.css")
 def asset_styles():
-    return FileResponse(FRONTEND_DIR / "styles.css", media_type="text/css")
+    resp = FileResponse(FRONTEND_DIR / "styles.css", media_type="text/css")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 
 @app.get("/assets/app.js")
 def asset_app_js():
-    return FileResponse(FRONTEND_DIR / "app.js", media_type="application/javascript")
+    resp = FileResponse(FRONTEND_DIR / "app.js", media_type="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
