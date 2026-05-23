@@ -94,8 +94,8 @@ def _province_label(pid: str) -> str:
     return PROVINCES.get(pid, {}).get("name", pid)
 
 
-def _rest_day_monitoring(today: str) -> list[dict[str, Any]]:
-    """Sorteos del dia solo para mirar — sin apostar."""
+def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]:
+    """Movimientos del sabado en el mismo formato del ledger — sin apostar ni sumar."""
     items: list[dict[str, Any]] = []
     for slot in DRAW_TIMES:
         for pid in CAJA_PROVINCES:
@@ -109,19 +109,38 @@ def _rest_day_monitoring(today: str) -> list[dict[str, Any]]:
                 ),
                 None,
             )
+            digit = _province_active_digit(pid)
+            state = _replay_province_state(pid, entries)
+            result_digit = int(row["last_digit"]) if row else None
             items.append(
                 {
-                    "draw_type": slot["id"],
-                    "draw_name": slot["name"],
-                    "draw_time": f"{slot['hour']:02d}:{slot.get('minute', 0):02d} hs",
                     "province": pid,
-                    "province_label": _province_label(pid),
-                    "result_digit": int(row["last_digit"]) if row else None,
-                    "result_number": row["number"] if row else None,
+                    "draw_type": slot["id"],
+                    "draw_date": today,
+                    "digit_played": digit,
+                    "stake": 0.0,
+                    "reference_stake": float(state["stake"]),
+                    "result_digit": result_digit,
+                    "hit": 0,
+                    "payout": 0.0,
+                    "new_digit": None,
+                    "note": "No aposto — dia de descanso",
+                    "rest_day": True,
                     "has_result": row is not None,
+                    "processed_at": datetime.now().isoformat(timespec="seconds"),
                 }
             )
+    items.sort(key=lambda e: (DRAW_ORDER.get(e["draw_type"], 0), e["province"]))
     return items
+
+
+def _merge_display_entries(real: list[dict], rest: list[dict]) -> list[dict]:
+    merged = real + rest
+    merged.sort(
+        key=lambda e: (e["draw_date"], DRAW_ORDER.get(e["draw_type"], 0), e["province"]),
+        reverse=True,
+    )
+    return merged
 
 
 def _replay_province_state(pid: str, entries: list[dict] | None = None) -> dict[str, float | int]:
@@ -386,22 +405,23 @@ def _active_bets() -> list[dict[str, Any]]:
                 "potential_win": round(stake * settings["payout_multiplier"], 2),
                 "enabled": not rest_today,
                 "rest_day": rest_today,
-                "rest_message": "Sin jugar — sabado de descanso" if rest_today else "",
+                "rest_message": "No aposto — dia de descanso" if rest_today else "",
             }
         )
     return bets
 
 
 def _caja_totals(entries: list[dict]) -> dict[str, float]:
-    invertido = sum(e["stake"] for e in entries)
-    ganado = sum(e["payout"] for e in entries)
-    aciertos = sum(1 for e in entries if e["hit"])
+    betting = [e for e in entries if not e.get("rest_day")]
+    invertido = sum(e["stake"] for e in betting)
+    ganado = sum(e["payout"] for e in betting)
+    aciertos = sum(1 for e in betting if e["hit"])
     return {
         "invertido": round(invertido, 2),
         "ganado": round(ganado, 2),
         "neto": round(ganado - invertido, 2),
         "aciertos": aciertos,
-        "jugadas": len(entries),
+        "jugadas": len(betting),
     }
 
 
@@ -425,15 +445,19 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
     if not entries or _needs_session_rebuild(entries):
         rebuild_session_ledger()
     process_new_results()
-    entries = get_betting_entries_filtered(
+    today = datetime.now().date().isoformat()
+    rest_today = is_today_rest_day()
+    real_entries = get_betting_entries_filtered(
         provinces=CAJA_PROVINCES,
         limit=limit,
     )
-    totals = _caja_totals(entries)
+    rest_entries = _rest_day_movements(today, real_entries) if rest_today else []
+    entries = _merge_display_entries(real_entries, rest_entries)
+    totals = _caja_totals(real_entries)
     saldo = round(settings["initial_balance"] + totals["neto"], 2)
 
     by_province: dict[str, dict[str, float]] = {}
-    for e in entries:
+    for e in real_entries:
         p = e["province"]
         if p not in by_province:
             by_province[p] = {"invertido": 0.0, "ganado": 0.0, "neto": 0.0}
@@ -445,8 +469,6 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             by_province[p][k] = round(by_province[p][k], 2)
 
     draw = DRAW_INFO.get(CAJA_DRAW, DRAW_TIMES[1])
-    today = datetime.now().date().isoformat()
-    rest_today = is_today_rest_day()
     return {
         "settings": settings,
         "session": {
@@ -457,7 +479,6 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             "rule": f"Sesion desde el {CAJA_SESSION_START} · sync auto 5 min despues de cada sorteo",
             "status": _session_status(),
             "rest_day": rest_today,
-            "monitor": _rest_day_monitoring(today) if rest_today else [],
         },
         "caja": {
             **totals,

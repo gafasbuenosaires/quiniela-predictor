@@ -244,14 +244,32 @@ function renderActiveBets(bets) {
   wrap.innerHTML = bets
     .map((b) => {
       if (b.rest_day) {
+        const color = DIGIT_COLORS[b.active_digit] || "#3dd68c";
+        const threshold = b.double_threshold || 6;
+        const pctStreak = Math.min(100, (b.loss_streak / threshold) * 100);
         return `
-      <article class="caja-bet-card rest-day">
+      <article class="caja-bet-card rest-day" data-province="${b.province}">
         <header class="caja-bet-head">
           <span class="caja-bet-prov">${b.province_label}</span>
-          <span class="caja-bet-draw rest-tag">Sin jugar</span>
+          <span class="caja-bet-draw">${b.draw_name} · ${b.draw_time}</span>
         </header>
-        <p class="caja-rest-msg">${b.rest_message || "Sabado de descanso — solo monitoreo"}</p>
-        <p class="caja-rest-next muted">Proximo numero: <strong style="color:${DIGIT_COLORS[b.active_digit]}">${b.active_digit}</strong> · racha ${b.loss_streak}/${b.double_threshold || 6} (congelada)</p>
+        <div class="caja-bet-digit-wrap">
+          <label class="caja-bet-lbl">Numero (sin jugar hoy)</label>
+          <input type="number" class="caja-bet-digit" min="0" max="9" value="${b.active_digit}" disabled style="color:${color}" />
+        </div>
+        <div class="caja-bet-meta">
+          <div><span class="meta-lbl">Apuesta ref.</span><strong class="caja-bet-stake muted">${money(b.stake)}</strong></div>
+          <div><span class="meta-lbl">Si gana (x7)</span><strong class="muted">${money(b.potential_win)}</strong></div>
+        </div>
+        <div class="caja-streak">
+          <div class="caja-streak-top">
+            <span>Fallos seguidos</span>
+            <strong>${b.loss_streak} / ${threshold}</strong>
+          </div>
+          <div class="caja-streak-bar"><div class="caja-streak-fill" style="width:${pctStreak}%"></div></div>
+          <p class="caja-streak-hint muted">Racha congelada — sabado de descanso</p>
+        </div>
+        <p class="caja-rest-msg">${b.rest_message || "No aposto — dia de descanso"}</p>
       </article>`;
       }
       const color = DIGIT_COLORS[b.active_digit] || "#3dd68c";
@@ -311,38 +329,6 @@ async function saveSingleBet(province, drawType, card) {
   await loadCaja();
 }
 
-function renderCajaMonitor(monitor) {
-  const panel = $("cajaSaturdayMonitor");
-  if (!panel) return;
-  if (!monitor?.length) {
-    panel.classList.add("hidden");
-    panel.innerHTML = "";
-    return;
-  }
-  panel.classList.remove("hidden");
-  panel.innerHTML = `
-    <h3>Monitoreo sabado — sin apostar</h3>
-    <p class="muted">Los sorteos se siguen aca pero no suman en la caja.</p>
-    <div class="caja-monitor-grid">
-      ${monitor
-        .map((m) => {
-          const digit = m.result_digit;
-          const color = digit != null ? DIGIT_COLORS[digit] : "#8b9bb4";
-          const result =
-            digit != null
-              ? `<strong style="color:${color}">${digit}</strong> <span class="muted">(${m.result_number})</span>`
-              : `<span class="muted">Pendiente</span>`;
-          return `
-        <article class="caja-monitor-chip">
-          <span class="cm-draw">${m.draw_name} · ${m.draw_time}</span>
-          <span class="cm-prov">${m.province_label}</span>
-          <span class="cm-res">Salio: ${result}</span>
-        </article>`;
-        })
-        .join("")}
-    </div>`;
-}
-
 function renderCaja(state) {
   const c = state.caja || {};
   const restDay = state.session?.rest_day;
@@ -350,12 +336,11 @@ function renderCaja(state) {
   if (banner) {
     if (restDay) {
       banner.classList.remove("hidden");
-      banner.textContent = "Sabado — dia de descanso del apostador. Monitoreamos los sorteos pero no se juega ni cuenta en la caja.";
+      banner.textContent = "Sabado — dia de descanso. Los sorteos aparecen en movimientos pero no se apuesta ni suma en la caja.";
     } else {
       banner.classList.add("hidden");
     }
   }
-  renderCajaMonitor(restDay ? state.session?.monitor : []);
   $("cajaInvertido").textContent = money(c.invertido);
   $("cajaGanado").textContent = money(c.ganado);
   $("cajaNeto").textContent = money(c.neto);
@@ -386,7 +371,25 @@ function renderCaja(state) {
   $("cajaLedgerBody").innerHTML = entries.length
     ? entries
         .map(
-          (e) => `
+          (e) => {
+            if (e.rest_day) {
+              const played = DIGIT_COLORS[e.digit_played] || "#fff";
+              const result =
+                e.result_digit != null
+                  ? `<strong style="color:${DIGIT_COLORS[e.result_digit]}">${e.result_digit}</strong>`
+                  : `<span class="muted">Pendiente</span>`;
+              return `
+      <tr class="rest-day-row">
+        <td>${e.draw_date}</td>
+        <td>${DRAW_LABEL[e.draw_type] || e.draw_type}</td>
+        <td>${PROVINCE_SHORT[e.province] || e.province}</td>
+        <td><strong style="color:${played}">${e.digit_played}</strong></td>
+        <td>${result}</td>
+        <td class="muted">—</td>
+        <td colspan="2" class="caja-rest-ledger">${e.note || "No aposto — dia de descanso"}</td>
+      </tr>`;
+            }
+            return `
       <tr class="${e.hit ? "hit-row" : ""}">
         <td>${e.draw_date}</td>
         <td>${DRAW_LABEL[e.draw_type] || e.draw_type}</td>
@@ -396,7 +399,8 @@ function renderCaja(state) {
         <td>${money(e.stake)}</td>
         <td>${e.hit ? "✓ GANO" : "Perdio"}</td>
         <td class="win">${e.hit ? money(e.payout) : "—"}</td>
-      </tr>`
+      </tr>`;
+          }
         )
         .join("")
     : `<tr><td colspan="8" class="muted">Sin movimientos aun.</td></tr>`;
