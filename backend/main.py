@@ -166,8 +166,10 @@ def api_sync(
     else:
         result = {"provinces": {province: sync_history(days, province)}}
     if result.get("total_records_upserted", 0) == 0 and province == "all":
-        seed = ensure_draws()
-        result["seed"] = seed
+        from backend.seed.loader import merge_seed_draws
+
+        added = merge_seed_draws()
+        result["seed"] = {"merged": True, "records_added": added}
     elif province != "all":
         total = sum(
             p.get("records_upserted", 0)
@@ -175,8 +177,10 @@ def api_sync(
             if isinstance(p, dict)
         )
         if total == 0:
-            seed = ensure_draws()
-            result["seed"] = seed
+            from backend.seed.loader import merge_seed_draws
+
+            added = merge_seed_draws()
+            result["seed"] = {"merged": True, "records_added": added}
     resolved = resolve_predictions()
     betting = process_new_results()
     draw_sync = get_draw_sync_status()
@@ -317,6 +321,27 @@ def api_caja_reset():
 def api_caja_rebuild():
     result = rebuild_session_ledger()
     return {"result": result, "state": get_caja_state()}
+
+
+@app.post("/api/import-draws")
+def api_import_draws(payload: dict = Body(...)):
+    """Recibe sorteos desde la PC local (Render no puede scrapear solo)."""
+    from backend.database import upsert_draws
+    from backend.seed.loader import export_draws_snapshot, merge_seed_draws
+
+    rows = payload.get("rows")
+    if rows is None:
+        rows = export_draws_snapshot(int(payload.get("days", 30)))
+    added = upsert_draws(rows)
+    merge_seed_draws()
+    betting = process_new_results()
+    draw_sync = get_draw_sync_status()
+    return {
+        "records_upserted": added,
+        "betting": betting,
+        "draw_sync": draw_sync,
+        "state": get_caja_state(),
+    }
 
 
 @app.post("/api/caja/process")

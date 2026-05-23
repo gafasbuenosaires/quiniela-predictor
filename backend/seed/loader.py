@@ -21,11 +21,25 @@ def load_seed_draws() -> int:
     return added
 
 
+def merge_seed_draws() -> int:
+    """Upsert snapshot — actualiza sorteos faltantes en la nube."""
+    return load_seed_draws()
+
+
 def ensure_draws(min_records: int = 1) -> dict[str, int | bool]:
-    """Carga seed si no hay sorteos en la base."""
+    """Carga o fusiona seed si hay pocos sorteos o el scraper fallo."""
     current = len(get_draws(days=30))
     if current >= min_records:
         return {"seeded": False, "records_before": current, "records_added": 0}
     added = load_seed_draws()
     after = len(get_draws(days=30))
     return {"seeded": added > 0, "records_before": current, "records_added": added, "records_after": after}
+
+
+def export_draws_snapshot(days: int = 30) -> list[dict]:
+    from backend.config import PROVINCES
+
+    rows: list[dict] = []
+    for pid in PROVINCES:
+        rows.extend(get_draws(province=pid, days=days))
+    return rows
