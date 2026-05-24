@@ -10,7 +10,7 @@ from backend.config import (
     CAJA_DOUBLE_AFTER_LOSSES,
     CAJA_DRAW,
     CAJA_PROVINCES,
-    CAJA_REST_WEEKDAYS,
+    CAJA_HOLIDAYS,
     CAJA_SESSION_NACIONAL_PREV_DIGIT,
     CAJA_SESSION_NACIONAL_START,
     CAJA_SESSION_PROVINCIA_DIGIT,
@@ -33,23 +33,25 @@ from backend.database import (
     insert_betting_entry,
     purge_betting_entries_before_session,
     purge_betting_entries_excluded_draws,
+    purge_betting_entries_on_dates,
     purge_betting_entries_on_weekdays,
     upsert_betting_settings,
     upsert_betting_slot,
+)
+from backend.rest_days import (
+    is_rest_day,
+    is_today_rest_day,
+    rest_day_kind,
+    rest_day_label,
+    rest_day_note,
+    session_headline,
+    today_rest_kind,
 )
 from backend.timeutil import draw_datetime_local, now_local, today_local
 
 DRAW_INFO = {d["id"]: d for d in DRAW_TIMES}
 DRAW_ORDER = {d["id"]: i for i, d in enumerate(DRAW_TIMES)}
 CAJA_DRAW_ORDER = DRAW_ORDER.get(CAJA_DRAW, 1)
-
-
-def is_rest_day(draw_date: str) -> bool:
-    return datetime.fromisoformat(draw_date).weekday() in CAJA_REST_WEEKDAYS
-
-
-def is_today_rest_day() -> bool:
-    return now_local().date().weekday() in CAJA_REST_WEEKDAYS
 
 
 def _should_process_draw(draw_date: str, draw_type: str) -> bool:
@@ -126,16 +128,18 @@ def _ensure_today_draws() -> None:
         merge_seed_draws()
 
 
-def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]:
-    """Movimientos del sabado en el mismo formato del ledger — sin apostar ni sumar."""
+def _rest_day_movements(draw_date: str, entries: list[dict]) -> list[dict[str, Any]]:
+    """Movimientos de dia de descanso en el ledger — sin apostar ni sumar."""
+    kind = rest_day_kind(draw_date)
+    note = rest_day_note(draw_date)
     items: list[dict[str, Any]] = []
     for slot in DRAW_TIMES:
         for pid in CAJA_PROVINCES:
             row = next(
                 (
                     d
-                    for d in get_draws(province=pid, from_date=today)
-                    if d["draw_date"] == today
+                    for d in get_draws(province=pid, from_date=draw_date)
+                    if d["draw_date"] == draw_date
                     and d["draw_type"] == slot["id"]
                     and d["position"] == 1
                 ),
@@ -148,7 +152,7 @@ def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]
                 {
                     "province": pid,
                     "draw_type": slot["id"],
-                    "draw_date": today,
+                    "draw_date": draw_date,
                     "digit_played": digit,
                     "stake": 0.0,
                     "reference_stake": float(state["stake"]),
@@ -156,8 +160,10 @@ def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]
                     "hit": 0,
                     "payout": 0.0,
                     "new_digit": None,
-                    "note": "No aposto — dia de descanso",
+                    "note": note,
                     "rest_day": True,
+                    "rest_kind": kind,
+                    "rest_label": rest_day_label(draw_date),
                     "has_result": row is not None,
                     "processed_at": now_local().isoformat(timespec="seconds"),
                 }
@@ -167,7 +173,7 @@ def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]
 
 
 def _all_rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]:
-    """Todos los sabados de la sesion en el ledger (aunque ya sea domingo)."""
+    """Todos los dias de descanso de la sesion en el ledger."""
     items: list[dict[str, Any]] = []
     start = datetime.fromisoformat(CAJA_SESSION_START).date()
     end = datetime.fromisoformat(today).date()
@@ -407,10 +413,12 @@ def rebuild_session_ledger() -> dict[str, Any]:
 
 def _session_status() -> dict[str, str]:
     if is_today_rest_day():
+        today = today_local()
+        headline = session_headline(today)
         return {
-            "headline": "Sabado — dia de descanso del apostador (solo monitoreo, sin jugar)",
-            "nacional": "Nacional: sin apostar hoy · seguimos con el 3 el lunes",
-            "provincia": "Provincia: sin apostar hoy · seguimos con el 5 el lunes",
+            "headline": headline,
+            "nacional": "Nacional: sin apostar hoy · racha congelada",
+            "provincia": "Provincia: sin apostar hoy · racha congelada",
         }
     return {
         "headline": "Jugando el 3 (Nacional) y el 5 (Provincia) en los 4 sorteos del dia",
@@ -426,6 +434,7 @@ def _active_bets() -> list[dict[str, Any]]:
     entries = get_betting_entries_filtered(provinces=CAJA_PROVINCES, limit=500)
     bets: list[dict[str, Any]] = []
     rest_today = is_today_rest_day()
+    rest_msg = rest_day_note(today_local()) if rest_today else ""
 
     for pid in CAJA_PROVINCES:
         next_sid = get_next_draw(province=pid)["next_draw"]
@@ -451,7 +460,8 @@ def _active_bets() -> list[dict[str, Any]]:
                 "potential_win": round(stake * settings["payout_multiplier"], 2),
                 "enabled": not rest_today,
                 "rest_day": rest_today,
-                "rest_message": "No aposto — dia de descanso" if rest_today else "",
+                "rest_kind": today_rest_kind() if rest_today else None,
+                "rest_message": rest_msg,
             }
         )
     return bets
@@ -473,11 +483,14 @@ def _caja_totals(entries: list[dict]) -> dict[str, float]:
 
 def _purge_invalid_caja_entries() -> int:
     """Elimina movimientos anteriores al inicio de sesion o sorteos previos a Matutina ese dia."""
+    from backend.config import CAJA_REST_WEEKDAYS
+
     excluded = [dt for dt, idx in DRAW_ORDER.items() if idx < CAJA_DRAW_ORDER]
     n1 = purge_betting_entries_before_session(CAJA_SESSION_START, CAJA_PROVINCES)
     n2 = purge_betting_entries_excluded_draws(CAJA_SESSION_START, excluded, CAJA_PROVINCES)
     n3 = purge_betting_entries_on_weekdays(CAJA_REST_WEEKDAYS, CAJA_PROVINCES)
-    return n1 + n2 + n3
+    n4 = purge_betting_entries_on_dates(list(CAJA_HOLIDAYS.keys()), CAJA_PROVINCES)
+    return n1 + n2 + n3 + n4
 
 
 def get_caja_state(limit: int = 50) -> dict[str, Any]:
@@ -526,6 +539,8 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             "rule": f"Sesion desde el {CAJA_SESSION_START} · sync auto 5 min despues de cada sorteo",
             "status": _session_status(),
             "rest_day": rest_today,
+            "rest_kind": today_rest_kind() if rest_today else None,
+            "rest_label": rest_day_label(today) if rest_today else "",
         },
         "caja": {
             **totals,

@@ -291,9 +291,9 @@ function renderActiveBets(bets) {
             <strong>${b.loss_streak} / ${threshold}</strong>
           </div>
           <div class="caja-streak-bar"><div class="caja-streak-fill" style="width:${pctStreak}%"></div></div>
-          <p class="caja-streak-hint muted">Racha congelada — sabado de descanso</p>
+          <p class="caja-streak-hint muted">Racha congelada — dia de descanso</p>
         </div>
-        <p class="caja-rest-msg">${b.rest_message || "No aposto — dia de descanso"}</p>
+        <p class="caja-rest-msg">${b.rest_message || b.rest_label || "No aposto — dia de descanso"}</p>
       </article>`;
       }
       const color = DIGIT_COLORS[b.active_digit] || "#3dd68c";
@@ -360,7 +360,11 @@ function renderCaja(state) {
   if (banner) {
     if (restDay) {
       banner.classList.remove("hidden");
-      banner.textContent = "Sabado — dia de descanso. Los sorteos aparecen en movimientos pero no se apuesta ni suma en la caja.";
+      const label =
+        state.session?.rest_label ||
+        state.session?.status?.headline ||
+        "Dia de descanso — solo monitoreo, sin jugar";
+      banner.textContent = `${label}. Los sorteos aparecen en movimientos pero no se apuesta ni suma en la caja.`;
     } else {
       banner.classList.add("hidden");
     }
@@ -406,7 +410,7 @@ function renderCaja(state) {
         <td><strong style="color:${played}">${e.digit_played}</strong></td>
         <td>${formatSalioCell(e.result_digit)}</td>
         <td class="muted">—</td>
-        <td colspan="2" class="caja-rest-ledger">${e.note || "No aposto — dia de descanso"}</td>
+        <td colspan="2" class="caja-rest-ledger">${e.note || e.rest_label || "No aposto — dia de descanso"}</td>
       </tr>`;
             }
             const salio = formatSalioCell(e.result_digit);

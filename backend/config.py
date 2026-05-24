@@ -73,6 +73,40 @@ CAJA_SESSION_NACIONAL_PREV_DIGIT = 2
 CAJA_SESSION_PROVINCIA_DIGIT = 5
 CAJA_SESSION_PROVINCIA_START = CAJA_SESSION_START
 
-# Sabado = descanso: monitorear sorteos pero no contabilizar apuestas
-CAJA_REST_WEEKDAYS = [5]  # 0=lunes .. 6=domingo (datetime.weekday: 0=lun, 5=sab)
+# Sabado y domingo = descanso; feriados en CAJA_HOLIDAYS
+CAJA_REST_WEEKDAYS = [5, 6]  # 0=lunes .. 6=domingo (5=sab, 6=dom)
 APP_TIMEZONE = "America/Argentina/Buenos_Aires"
+
+# Feriados nacionales Argentina (ISO date -> nombre corto)
+CAJA_HOLIDAYS: dict[str, str] = {
+    "2026-01-01": "Ano Nuevo",
+    "2026-02-16": "Carnaval",
+    "2026-02-17": "Carnaval",
+    "2026-03-24": "Dia de la Memoria",
+    "2026-04-02": "Viernes Santo",
+    "2026-05-01": "Dia del Trabajador",
+    "2026-05-25": "Revolucion de Mayo",
+    "2026-06-17": "General Guemes",
+    "2026-06-20": "Dia de la Bandera",
+    "2026-07-09": "Dia de la Independencia",
+    "2026-08-17": "San Martin",
+    "2026-10-12": "Diversidad Cultural",
+    "2026-11-23": "Soberania Nacional",
+    "2026-12-08": "Inmaculada Concepcion",
+    "2026-12-25": "Navidad",
+    "2027-01-01": "Ano Nuevo",
+    "2027-02-08": "Carnaval",
+    "2027-02-09": "Carnaval",
+    "2027-03-24": "Dia de la Memoria",
+    "2027-03-26": "Viernes Santo",
+    "2027-05-01": "Dia del Trabajador",
+    "2027-05-25": "Revolucion de Mayo",
+    "2027-06-17": "General Guemes",
+    "2027-06-20": "Dia de la Bandera",
+    "2027-07-09": "Dia de la Independencia",
+    "2027-08-16": "San Martin",
+    "2027-10-11": "Diversidad Cultural",
+    "2027-11-22": "Soberania Nacional",
+    "2027-12-08": "Inmaculada Concepcion",
+    "2027-12-25": "Navidad",
+}

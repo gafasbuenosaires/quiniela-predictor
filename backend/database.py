@@ -537,6 +537,23 @@ def purge_betting_entries_excluded_draws(
         return cur.rowcount
 
 
+def purge_betting_entries_on_dates(
+    dates: list[str],
+    provinces: list[str] | None = None,
+) -> int:
+    if not dates:
+        return 0
+    placeholders = ",".join("?" * len(dates))
+    query = f"DELETE FROM betting_entries WHERE draw_date IN ({placeholders})"
+    params: list[Any] = list(dates)
+    if provinces:
+        query += f" AND province IN ({','.join('?' * len(provinces))})"
+        params.extend(provinces)
+    with get_conn() as conn:
+        cur = conn.execute(query, params)
+        return cur.rowcount
+
+
 def purge_betting_entries_on_weekdays(
     weekdays: list[int],
     provinces: list[str] | None = None,
