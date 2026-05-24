@@ -436,7 +436,9 @@ async function loadCaja() {
   renderCaja(state);
   try {
     await fetchDrawSyncStatus(false);
-    const needsSync = drawSyncStatus.some((s) => !s.has_result && s.phase !== "pending");
+    const needsSync = drawSyncStatus.some(
+      (s) => s.phase === "waiting_sync" || s.phase === "awaiting_result"
+    );
     if (needsSync) {
       await fetchDrawSyncStatus(true);
       const refreshed = await fetchJson("/api/caja");
@@ -1014,10 +1016,13 @@ function renderDrawResultsBar() {
         return `<span class="dr-chip done">${s.draw_name} <strong style="color:${c}">${s.result_digit}</strong></span>`;
       }
       if (s.phase === "awaiting_result" || s.phase === "syncing") {
-        return `<span class="dr-chip syncing">${s.draw_name} · buscando resultado...</span>`;
+        return `<span class="dr-chip syncing">${s.draw_name} · revisando cada 5 min hasta ${s.sync_until || "?"}</span>`;
       }
       if (s.phase === "waiting_sync") {
-        return `<span class="dr-chip wait">${s.draw_name} · sync ${s.sync_at}</span>`;
+        return `<span class="dr-chip wait">${s.draw_name} · sync ${s.sync_at} (cada 5 min, 1 h)</span>`;
+      }
+      if (s.phase === "missed") {
+        return `<span class="dr-chip missed">${s.draw_name} · sin numero publicado</span>`;
       }
       return `<span class="dr-chip pending">${s.draw_name} ${s.time}</span>`;
     })
@@ -1066,7 +1071,7 @@ async function pollDrawSync() {
   try {
     await fetchDrawSyncStatus(false);
     const needsCheck = drawSyncStatus.some(
-      (s) => !s.has_result && s.phase !== "pending"
+      (s) => s.phase === "waiting_sync" || s.phase === "awaiting_result"
     );
     if (needsCheck) {
       const check = await fetchDrawSyncStatus(true);

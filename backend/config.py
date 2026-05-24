@@ -49,7 +49,7 @@ PAYOUT_MULTIPLIER = 7
 AUTO_REFRESH_MINUTES = 15
 FRONTEND_POLL_SECONDS = 30
 POST_DRAW_SYNC_MINUTES = 5
-POST_DRAW_SYNC_RETRY_MINUTES = 35
+POST_DRAW_SYNC_WINDOW_MINUTES = 60  # reintentar cada 5 min hasta 1 h despues del sorteo
 
 # Caja de apuestas — sesion actual
 CAJA_PROVINCES = ["nacional", "buenos_aires"]

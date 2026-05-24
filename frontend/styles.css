@@ -128,6 +128,7 @@ body {
 }
 .dr-chip.syncing { border-color: var(--warn); color: var(--warn); }
 .dr-chip.wait { border-color: var(--accent2); color: var(--accent2); }
+.dr-chip.missed { border-color: #8b9bb4; color: #8b9bb4; opacity: 0.85; }
 .badge.updated { border-color: var(--accent); color: var(--accent); }
 
 .auto-label {

@@ -1,4 +1,4 @@
-"""Sync automatico ~5 min despues de cada sorteo."""
+"""Sync automatico: cada 5 min desde +5 min hasta 1 h despues de cada sorteo."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -9,24 +9,39 @@ from backend.config import (
     DRAW_TIMES,
     HISTORY_DAYS,
     POST_DRAW_SYNC_MINUTES,
+    POST_DRAW_SYNC_WINDOW_MINUTES,
 )
 from backend.database import get_draws, resolve_predictions
 from backend.scraper import sync_all_provinces
 from backend.timeutil import draw_datetime_local, now_local, today_local
 
-# Sorteos ya resueltos hoy (reinicia al reiniciar server)
 _done_keys: set[str] = set()
-# Ultimo intento de sync por sorteo/dia (reintenta cada POST_DRAW_SYNC_MINUTES)
 _last_sync_attempt: dict[str, datetime] = {}
 
 
-def _draw_datetime(slot: dict, day: datetime) -> datetime:
-    return draw_datetime_local(slot, day.date())
+def _sync_window(slot: dict, now: datetime) -> tuple[datetime, datetime, datetime]:
+    draw_dt = draw_datetime_local(slot, now.date())
+    sync_from = draw_dt + timedelta(minutes=POST_DRAW_SYNC_MINUTES)
+    sync_until = draw_dt + timedelta(minutes=POST_DRAW_SYNC_WINDOW_MINUTES)
+    return draw_dt, sync_from, sync_until
 
 
 def _has_draw_result(draw_type: str, draw_date: str, province: str = DEFAULT_PROVINCE) -> bool:
     rows = get_draws(province=province, from_date=draw_date, draw_type=draw_type)
     return any(r["draw_date"] == draw_date and r["position"] == 1 for r in rows)
+
+
+def _phase_for_slot(slot: dict, now: datetime, has_result: bool) -> tuple[str, datetime, datetime]:
+    draw_dt, sync_from, sync_until = _sync_window(slot, now)
+    if has_result:
+        return "done", sync_from, sync_until
+    if now < draw_dt:
+        return "pending", sync_from, sync_until
+    if now < sync_from:
+        return "waiting_sync", sync_from, sync_until
+    if now <= sync_until:
+        return "awaiting_result", sync_from, sync_until
+    return "missed", sync_from, sync_until
 
 
 def get_draw_sync_status() -> list[dict[str, Any]]:
@@ -36,19 +51,8 @@ def get_draw_sync_status() -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
 
     for slot in DRAW_TIMES:
-        draw_dt = _draw_datetime(slot, now)
-        sync_from = draw_dt + timedelta(minutes=POST_DRAW_SYNC_MINUTES)
-        key = f"{today}|{slot['id']}"
         has_result = _has_draw_result(slot["id"], today)
-
-        if has_result:
-            phase = "done"
-        elif now < draw_dt:
-            phase = "pending"
-        elif now < sync_from:
-            phase = "waiting_sync"
-        else:
-            phase = "awaiting_result"
+        phase, sync_from, sync_until = _phase_for_slot(slot, now, has_result)
 
         result_digit = None
         result_number = None
@@ -71,6 +75,7 @@ def get_draw_sync_status() -> list[dict[str, Any]]:
                 "draw_name": slot["name"],
                 "time": f"{slot['hour']:02d}:{slot.get('minute', 0):02d} hs",
                 "sync_at": sync_from.strftime("%H:%M"),
+                "sync_until": sync_until.strftime("%H:%M"),
                 "phase": phase,
                 "has_result": has_result,
                 "result_digit": result_digit,
@@ -83,8 +88,7 @@ def get_draw_sync_status() -> list[dict[str, Any]]:
 
 def maybe_sync_after_draw(force: bool = False) -> dict[str, Any]:
     """
-    Si pasaron 5+ min del sorteo, sincroniza hasta obtener el numero.
-    Reintenta cada minuto hasta POST_DRAW_SYNC_RETRY_MINUTES.
+    Sincroniza cada POST_DRAW_SYNC_MINUTES desde +5 min hasta 1 h post-sorteo.
     """
     from backend.betting import process_new_results
 
@@ -97,10 +101,11 @@ def maybe_sync_after_draw(force: bool = False) -> dict[str, Any]:
         if key in _done_keys and not force:
             continue
 
-        draw_dt = _draw_datetime(slot, now)
-        sync_from = draw_dt + timedelta(minutes=POST_DRAW_SYNC_MINUTES)
+        _, sync_from, sync_until = _sync_window(slot, now)
 
         if now < sync_from and not force:
+            continue
+        if now > sync_until and not force:
             continue
 
         if _has_draw_result(slot["id"], today):

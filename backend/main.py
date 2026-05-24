@@ -27,6 +27,7 @@ from backend.config import (
     FRONTEND_POLL_SECONDS,
     HISTORY_DAYS,
     POST_DRAW_SYNC_MINUTES,
+    POST_DRAW_SYNC_WINDOW_MINUTES,
     PROVINCES,
 )
 from backend.database import (
@@ -120,6 +121,7 @@ def api_config(request: Request):
         "poll_seconds": FRONTEND_POLL_SECONDS,
         "auto_sync_minutes": AUTO_REFRESH_MINUTES,
         "post_draw_sync_minutes": POST_DRAW_SYNC_MINUTES,
+        "post_draw_sync_window_minutes": POST_DRAW_SYNC_WINDOW_MINUTES,
         "draw_times": [
             {
                 "id": d["id"],
