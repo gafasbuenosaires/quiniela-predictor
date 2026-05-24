@@ -390,7 +390,10 @@ function renderCaja(state) {
   $("cajaMultiplier").value = s.payout_multiplier ?? 7;
   $("cajaDoubleAfter").value = s.double_after_losses ?? 6;
   const satRest = $("cajaSaturdayRest");
-  if (satRest) satRest.checked = s.saturday_rest_day !== false;
+  const satRestAdv = $("cajaSaturdayRestAdv");
+  const satOn = s.saturday_rest_day !== false;
+  if (satRest) satRest.checked = satOn;
+  if (satRestAdv) satRestAdv.checked = satOn;
 
   renderActiveBets(state.active_bets);
 
@@ -462,7 +465,7 @@ async function saveCajaSettings(extra = {}) {
       default_stake: Number($("cajaDefaultStake").value),
       payout_multiplier: Number($("cajaMultiplier").value),
       double_after_losses: Number($("cajaDoubleAfter").value),
-      saturday_rest_day: $("cajaSaturdayRest")?.checked ?? true,
+      saturday_rest_day: $("cajaSaturdayRest")?.checked ?? $("cajaSaturdayRestAdv")?.checked ?? true,
       ...extra,
     }),
   });
@@ -470,7 +473,16 @@ async function saveCajaSettings(extra = {}) {
 }
 
 async function saveSaturdayRest() {
+  syncSaturdayCheckboxes("main");
   await saveCajaSettings();
+}
+
+function syncSaturdayCheckboxes(source) {
+  const main = $("cajaSaturdayRest");
+  const adv = $("cajaSaturdayRestAdv");
+  if (!main || !adv) return;
+  if (source === "adv") main.checked = adv.checked;
+  else adv.checked = main.checked;
 }
 
 async function processCaja() {
@@ -1158,7 +1170,14 @@ $("toggleContext").addEventListener("click", () => {
 $("baseBet").addEventListener("change", loadMartingale);
 $("maxAttempts").addEventListener("change", loadMartingale);
 $("btnSaveCajaSettings")?.addEventListener("click", () => saveCajaSettings());
-$("cajaSaturdayRest")?.addEventListener("change", saveSaturdayRest);
+$("cajaSaturdayRest")?.addEventListener("change", () => {
+  syncSaturdayCheckboxes("main");
+  saveSaturdayRest();
+});
+$("cajaSaturdayRestAdv")?.addEventListener("change", () => {
+  syncSaturdayCheckboxes("adv");
+  saveSaturdayRest();
+});
 $("btnProcessCaja")?.addEventListener("click", processCaja);
 $("toggleCajaSettings")?.addEventListener("click", () => {
   $("cajaSettingsBody")?.classList.toggle("hidden");

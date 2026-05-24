@@ -178,6 +178,13 @@
           <p id="cajaRule" class="caja-rule"></p>
           <div id="cajaSessionStatus" class="caja-session-status"></div>
           <p class="caja-sync-note">Auto-actualiza cada 5 min desde 5 min post-sorteo hasta 1 h (por si tardan en publicar el numero).</p>
+          <div class="caja-saturday-row">
+            <label class="caja-saturday-toggle">
+              <input type="checkbox" id="cajaSaturdayRest" checked />
+              <strong>Sabado: dia de descanso</strong>
+              <span class="muted sm">Desactivar si los sabados se juega</span>
+            </label>
+          </div>
         </div>
         <div class="caja-summary-grid">
           <article class="caja-stat">
@@ -200,13 +207,6 @@
       </section>
 
       <div id="cajaRestBanner" class="caja-rest-banner hidden"></div>
-      <div class="caja-saturday-row">
-        <label class="caja-saturday-toggle">
-          <input type="checkbox" id="cajaSaturdayRest" checked />
-          <span>Sabado dia de descanso</span>
-          <span class="muted sm">(desactivar si los sabados se juega)</span>
-        </label>
-      </div>
       <div id="cajaActiveBets" class="caja-bets-grid"></div>
 
       <section class="card wide caja-settings collapsed-panel">
@@ -217,6 +217,10 @@
             <label>Apuesta base $<input type="number" id="cajaDefaultStake" min="1" step="1000" /></label>
             <label>Pago x<input type="number" id="cajaMultiplier" min="1" max="20" step="0.5" /></label>
             <label>Doblar cada <input type="number" id="cajaDoubleAfter" min="1" max="20" /> fallos</label>
+            <label class="caja-saturday-inline">
+              <input type="checkbox" id="cajaSaturdayRestAdv" checked />
+              Sabado dia de descanso
+            </label>
             <button type="button" class="btn ghost sm" id="btnSaveCajaSettings">Guardar</button>
           </div>
         </div>
@@ -254,6 +258,6 @@
   </div>
   </div>
 
-  <script src="/assets/app.js?v=10"></script>
+  <script src="/assets/app.js?v=11"></script>
 </body>
 </html>

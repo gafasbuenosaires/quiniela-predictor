@@ -1025,22 +1025,25 @@ body {
 }
 .caja-rest-banner.hidden { display: none; }
 .caja-saturday-row {
-  margin: 0.75rem 0 1rem;
-  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 2px solid #f0b42988;
+  background: rgba(240, 180, 41, 0.12);
 }
 .caja-saturday-toggle {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.5rem 0.75rem;
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   user-select: none;
 }
-.caja-saturday-toggle input { width: 18px; height: 18px; accent-color: #f0b429; }
-.caja-saturday-toggle .sm { font-size: 0.82rem; }
+.caja-saturday-toggle strong { color: #f0d890; }
+.caja-saturday-toggle input { width: 20px; height: 20px; accent-color: #f0b429; flex-shrink: 0; }
+.caja-saturday-toggle .sm { font-size: 0.82rem; width: 100%; }
+.caja-saturday-inline { display: inline-flex; align-items: center; gap: 0.4rem; }
 .caja-bet-card.rest-day { border-color: #f0b42955; opacity: 0.95; }
 .caja-rest-msg { margin: 0.5rem 0; color: #f0b429; font-weight: 600; }
 .caja-rest-next { margin: 0; font-size: 0.85rem; }
