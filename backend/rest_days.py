@@ -1,9 +1,9 @@
-"""Dias sin apostar: sabado, domingo y feriados por fecha."""
+"""Dias sin apostar: sabado (opcional), domingo y feriados por fecha."""
 from __future__ import annotations
 
 from datetime import datetime
 
-from backend.config import CAJA_HOLIDAYS, CAJA_REST_WEEKDAYS
+from backend.config import CAJA_HOLIDAYS, CAJA_REST_WEEKDAYS, SATURDAY_WEEKDAY
 from backend.timeutil import today_local
 
 REST_KIND_SATURDAY = "saturday"
@@ -11,15 +11,23 @@ REST_KIND_SUNDAY = "sunday"
 REST_KIND_HOLIDAY = "holiday"
 
 
+def saturday_rest_enabled() -> bool:
+    from backend.database import get_betting_settings
+
+    row = get_betting_settings()
+    if not row:
+        return True
+    return bool(row.get("saturday_rest_day", 1))
+
+
 def rest_day_kind(draw_date: str) -> str | None:
     if draw_date in CAJA_HOLIDAYS:
         return REST_KIND_HOLIDAY
     weekday = datetime.fromisoformat(draw_date).weekday()
+    if weekday == SATURDAY_WEEKDAY and saturday_rest_enabled():
+        return REST_KIND_SATURDAY
     if weekday in CAJA_REST_WEEKDAYS:
-        if weekday == 5:
-            return REST_KIND_SATURDAY
-        if weekday == 6:
-            return REST_KIND_SUNDAY
+        return REST_KIND_SUNDAY
     return None
 
 
@@ -33,6 +41,14 @@ def is_today_rest_day() -> bool:
 
 def today_rest_kind() -> str | None:
     return rest_day_kind(today_local())
+
+
+def rest_weekdays_to_purge() -> list[int]:
+    """Weekdays cuyas apuestas hay que borrar de la DB (descanso activo)."""
+    days = list(CAJA_REST_WEEKDAYS)
+    if saturday_rest_enabled():
+        days.append(SATURDAY_WEEKDAY)
+    return days
 
 
 def rest_day_note(draw_date: str) -> str:

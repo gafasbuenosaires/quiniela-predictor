@@ -73,8 +73,9 @@ CAJA_SESSION_NACIONAL_PREV_DIGIT = 2
 CAJA_SESSION_PROVINCIA_DIGIT = 5
 CAJA_SESSION_PROVINCIA_START = CAJA_SESSION_START
 
-# Sabado y domingo = descanso; feriados en CAJA_HOLIDAYS
-CAJA_REST_WEEKDAYS = [5, 6]  # 0=lunes .. 6=domingo (5=sab, 6=dom)
+# Domingo siempre descanso; sabado configurable (ver saturday_rest_day en settings)
+CAJA_REST_WEEKDAYS = [6]  # 0=lunes .. 6=domingo
+SATURDAY_WEEKDAY = 5
 APP_TIMEZONE = "America/Argentina/Buenos_Aires"
 
 # Feriados nacionales Argentina (ISO date -> nombre corto)

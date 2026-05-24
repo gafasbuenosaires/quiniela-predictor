@@ -71,6 +71,7 @@ def _default_settings() -> dict[str, Any]:
         "payout_multiplier": float(PAYOUT_MULTIPLIER),
         "auto_advance": False,
         "double_after_losses": CAJA_DOUBLE_AFTER_LOSSES,
+        "saturday_rest_day": True,
     }
 
 
@@ -82,6 +83,10 @@ def get_settings() -> dict[str, Any]:
         return defaults
     if "double_after_losses" not in row:
         row["double_after_losses"] = CAJA_DOUBLE_AFTER_LOSSES
+    if "saturday_rest_day" not in row:
+        row["saturday_rest_day"] = True
+    else:
+        row["saturday_rest_day"] = bool(row["saturday_rest_day"])
     return row
 
 
@@ -493,12 +498,12 @@ def _caja_totals(entries: list[dict]) -> dict[str, float]:
 
 def _purge_invalid_caja_entries() -> int:
     """Elimina movimientos anteriores al inicio de sesion o sorteos previos a Matutina ese dia."""
-    from backend.config import CAJA_REST_WEEKDAYS
+    from backend.rest_days import rest_weekdays_to_purge
 
     excluded = [dt for dt, idx in DRAW_ORDER.items() if idx < CAJA_DRAW_ORDER]
     n1 = purge_betting_entries_before_session(CAJA_SESSION_START, CAJA_PROVINCES)
     n2 = purge_betting_entries_excluded_draws(CAJA_SESSION_START, excluded, CAJA_PROVINCES)
-    n3 = purge_betting_entries_on_weekdays(CAJA_REST_WEEKDAYS, CAJA_PROVINCES)
+    n3 = purge_betting_entries_on_weekdays(rest_weekdays_to_purge(), CAJA_PROVINCES)
     n4 = purge_betting_entries_on_dates(list(CAJA_HOLIDAYS.keys()), CAJA_PROVINCES)
     return n1 + n2 + n3 + n4
 
@@ -571,6 +576,9 @@ def save_settings(payload: dict[str, Any]) -> dict[str, Any]:
         "payout_multiplier": float(payload.get("payout_multiplier", current["payout_multiplier"])),
         "auto_advance": False,
         "double_after_losses": int(payload.get("double_after_losses", current.get("double_after_losses", 6))),
+        "saturday_rest_day": bool(
+            payload.get("saturday_rest_day", current.get("saturday_rest_day", True))
+        ),
     }
     upsert_betting_settings(data)
     return data

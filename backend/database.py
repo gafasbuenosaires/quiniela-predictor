@@ -107,6 +107,10 @@ def _migrate_betting(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE betting_settings ADD COLUMN double_after_losses INTEGER NOT NULL DEFAULT 6"
         )
+    if "saturday_rest_day" not in scols:
+        conn.execute(
+            "ALTER TABLE betting_settings ADD COLUMN saturday_rest_day INTEGER NOT NULL DEFAULT 1"
+        )
     if "betting_slots" in tables:
         bcols = {r[1] for r in conn.execute("PRAGMA table_info(betting_slots)").fetchall()}
         if "base_stake" not in bcols:
@@ -373,6 +377,7 @@ def get_betting_settings() -> dict | None:
         return None
     d = dict(row)
     d["auto_advance"] = bool(d["auto_advance"])
+    d["saturday_rest_day"] = bool(d.get("saturday_rest_day", 1))
     return d
 
 
@@ -383,14 +388,15 @@ def upsert_betting_settings(data: dict[str, Any]) -> None:
             """
             INSERT INTO betting_settings (
                 id, initial_balance, default_stake, payout_multiplier,
-                auto_advance, double_after_losses, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?)
+                auto_advance, double_after_losses, saturday_rest_day, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 initial_balance = excluded.initial_balance,
                 default_stake = excluded.default_stake,
                 payout_multiplier = excluded.payout_multiplier,
                 auto_advance = excluded.auto_advance,
                 double_after_losses = excluded.double_after_losses,
+                saturday_rest_day = excluded.saturday_rest_day,
                 updated_at = excluded.updated_at
             """,
             (
@@ -399,6 +405,7 @@ def upsert_betting_settings(data: dict[str, Any]) -> None:
                 data["payout_multiplier"],
                 1 if data.get("auto_advance", False) else 0,
                 int(data.get("double_after_losses", 6)),
+                1 if data.get("saturday_rest_day", True) else 0,
                 now,
             ),
         )

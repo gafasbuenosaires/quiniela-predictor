@@ -389,6 +389,8 @@ function renderCaja(state) {
   $("cajaDefaultStake").value = s.default_stake ?? 30000;
   $("cajaMultiplier").value = s.payout_multiplier ?? 7;
   $("cajaDoubleAfter").value = s.double_after_losses ?? 6;
+  const satRest = $("cajaSaturdayRest");
+  if (satRest) satRest.checked = s.saturday_rest_day !== false;
 
   renderActiveBets(state.active_bets);
 
@@ -451,7 +453,7 @@ async function loadCaja() {
   setLastUpdate();
 }
 
-async function saveCajaSettings() {
+async function saveCajaSettings(extra = {}) {
   await fetchJson("/api/caja/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -460,9 +462,15 @@ async function saveCajaSettings() {
       default_stake: Number($("cajaDefaultStake").value),
       payout_multiplier: Number($("cajaMultiplier").value),
       double_after_losses: Number($("cajaDoubleAfter").value),
+      saturday_rest_day: $("cajaSaturdayRest")?.checked ?? true,
+      ...extra,
     }),
   });
   await loadCaja();
+}
+
+async function saveSaturdayRest() {
+  await saveCajaSettings();
 }
 
 async function processCaja() {
@@ -1149,7 +1157,8 @@ $("toggleContext").addEventListener("click", () => {
 });
 $("baseBet").addEventListener("change", loadMartingale);
 $("maxAttempts").addEventListener("change", loadMartingale);
-$("btnSaveCajaSettings")?.addEventListener("click", saveCajaSettings);
+$("btnSaveCajaSettings")?.addEventListener("click", () => saveCajaSettings());
+$("cajaSaturdayRest")?.addEventListener("change", saveSaturdayRest);
 $("btnProcessCaja")?.addEventListener("click", processCaja);
 $("toggleCajaSettings")?.addEventListener("click", () => {
   $("cajaSettingsBody")?.classList.toggle("hidden");
