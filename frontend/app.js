@@ -578,8 +578,7 @@ function selectProvince(id) {
 
 function buildNav() {
   const nav = $("provinceNav");
-  let html = `<button class="province-btn active" data-province="overview">Todas</button>`;
-  html += `<button class="province-btn caja-btn" data-province="caja">Caja</button>`;
+  let html = `<button class="province-btn caja-btn active" data-province="caja">Caja</button>`;
   for (const p of config.provinces) {
     html += `<button class="province-btn" data-province="${p.id}">${p.name}</button>`;
   }
@@ -986,10 +985,10 @@ async function syncAll() {
 }
 
 async function refreshCurrent() {
-  if (currentProvince === "overview" || !currentProvince) {
-    await loadOverview();
-  } else if (currentProvince === "caja") {
+  if (currentProvince === "caja" || !currentProvince) {
     await loadCaja();
+  } else if (currentProvince === "overview") {
+    await loadOverview();
   } else {
     await loadDetail(currentProvince);
   }
@@ -1104,9 +1103,8 @@ async function bootApp(preloadedConfig = null) {
   setInterval(tickClock, 1000);
   config = preloadedConfig || (await fetchJson("/api/config"));
   buildNav();
-  currentProvince = "overview";
+  selectProvince("caja");
   await loadStatus();
-  await loadOverview();
   startTimers();
   await fetchDrawSyncStatus(true);
   lastDrawResultsHash = drawResultsHash(drawSyncStatus);
