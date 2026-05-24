@@ -249,9 +249,8 @@ function formatSalioCell(digit) {
   return `<span class="muted pending-result">${PENDING_RESULT_LABEL}</span>`;
 }
 
-function isRestLedgerEntry(e, restDay) {
-  if (e.rest_day) return true;
-  return Boolean(restDay && e.draw_date === todayIso() && Number(e.stake) === 0);
+function isRestLedgerEntry(e) {
+  return Boolean(e.rest_day);
 }
 
 const PROVINCE_SHORT = {
@@ -397,7 +396,7 @@ function renderCaja(state) {
     ? entries
         .map(
           (e) => {
-            if (isRestLedgerEntry(e, restDay)) {
+            if (isRestLedgerEntry(e)) {
               const played = DIGIT_COLORS[e.digit_played] || "#fff";
               return `
       <tr class="rest-day-row">

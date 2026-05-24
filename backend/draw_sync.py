@@ -12,6 +12,7 @@ from backend.config import (
 )
 from backend.database import get_draws, resolve_predictions
 from backend.scraper import sync_all_provinces
+from backend.timeutil import draw_datetime_local, now_local, today_local
 
 # Sorteos ya resueltos hoy (reinicia al reiniciar server)
 _done_keys: set[str] = set()
@@ -20,7 +21,7 @@ _last_sync_attempt: dict[str, datetime] = {}
 
 
 def _draw_datetime(slot: dict, day: datetime) -> datetime:
-    return datetime(day.year, day.month, day.day, slot["hour"], slot.get("minute", 0))
+    return draw_datetime_local(slot, day.date())
 
 
 def _has_draw_result(draw_type: str, draw_date: str, province: str = DEFAULT_PROVINCE) -> bool:
@@ -30,8 +31,8 @@ def _has_draw_result(draw_type: str, draw_date: str, province: str = DEFAULT_PRO
 
 def get_draw_sync_status() -> list[dict[str, Any]]:
     """Estado de cada sorteo del dia para la UI."""
-    now = datetime.now()
-    today = now.date().isoformat()
+    now = now_local()
+    today = today_local()
     items: list[dict[str, Any]] = []
 
     for slot in DRAW_TIMES:
@@ -87,8 +88,8 @@ def maybe_sync_after_draw(force: bool = False) -> dict[str, Any]:
     """
     from backend.betting import process_new_results
 
-    now = datetime.now()
-    today = now.date().isoformat()
+    now = now_local()
+    today = today_local()
     synced_draws: list[str] = []
 
     for slot in DRAW_TIMES:

@@ -37,6 +37,7 @@ from backend.database import (
     upsert_betting_settings,
     upsert_betting_slot,
 )
+from backend.timeutil import draw_datetime_local, now_local, today_local
 
 DRAW_INFO = {d["id"]: d for d in DRAW_TIMES}
 DRAW_ORDER = {d["id"]: i for i, d in enumerate(DRAW_TIMES)}
@@ -48,7 +49,7 @@ def is_rest_day(draw_date: str) -> bool:
 
 
 def is_today_rest_day() -> bool:
-    return datetime.now().date().weekday() in CAJA_REST_WEEKDAYS
+    return now_local().date().weekday() in CAJA_REST_WEEKDAYS
 
 
 def _should_process_draw(draw_date: str, draw_type: str) -> bool:
@@ -96,13 +97,9 @@ def _province_label(pid: str) -> str:
 
 def _ensure_today_draws() -> None:
     """Fusiona seed si faltan sorteos de hoy (Render pierde DB al redeploy)."""
-    today = datetime.now().date().isoformat()
-    now = datetime.now()
-    past_slots = [
-        slot
-        for slot in DRAW_TIMES
-        if now >= datetime(now.year, now.month, now.day, slot["hour"], slot.get("minute", 0))
-    ]
+    today = today_local()
+    now = now_local()
+    past_slots = [slot for slot in DRAW_TIMES if now >= draw_datetime_local(slot)]
     if not past_slots:
         return
     missing = False
@@ -162,10 +159,24 @@ def _rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]
                     "note": "No aposto — dia de descanso",
                     "rest_day": True,
                     "has_result": row is not None,
-                    "processed_at": datetime.now().isoformat(timespec="seconds"),
+                    "processed_at": now_local().isoformat(timespec="seconds"),
                 }
             )
     items.sort(key=lambda e: (DRAW_ORDER.get(e["draw_type"], 0), e["province"]))
+    return items
+
+
+def _all_rest_day_movements(today: str, entries: list[dict]) -> list[dict[str, Any]]:
+    """Todos los sabados de la sesion en el ledger (aunque ya sea domingo)."""
+    items: list[dict[str, Any]] = []
+    start = datetime.fromisoformat(CAJA_SESSION_START).date()
+    end = datetime.fromisoformat(today).date()
+    day = start
+    while day <= end:
+        ds = day.isoformat()
+        if is_rest_day(ds):
+            items.extend(_rest_day_movements(ds, entries))
+        day += timedelta(days=1)
     return items
 
 
@@ -480,14 +491,14 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
     if not entries or _needs_session_rebuild(entries):
         rebuild_session_ledger()
     process_new_results()
-    today = datetime.now().date().isoformat()
+    today = today_local()
     rest_today = is_today_rest_day()
     _ensure_today_draws()
     real_entries = get_betting_entries_filtered(
         provinces=CAJA_PROVINCES,
         limit=limit,
     )
-    rest_entries = _rest_day_movements(today, real_entries) if rest_today else []
+    rest_entries = _all_rest_day_movements(today, real_entries)
     entries = _merge_display_entries(real_entries, rest_entries)
     totals = _caja_totals(real_entries)
     saldo = round(settings["initial_balance"] + totals["neto"], 2)
