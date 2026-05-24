@@ -97,35 +97,54 @@ def _province_label(pid: str) -> str:
     return PROVINCES.get(pid, {}).get("name", pid)
 
 
-def _ensure_today_draws() -> None:
-    """Fusiona seed si faltan sorteos de hoy (Render pierde DB al redeploy)."""
+def _get_draw_row(draw_date: str, draw_type: str, province: str) -> dict | None:
+    return next(
+        (
+            d
+            for d in get_draws(province=province, from_date=draw_date)
+            if d["draw_date"] == draw_date
+            and d["draw_type"] == draw_type
+            and d["position"] == 1
+        ),
+        None,
+    )
+
+
+def _date_draws_missing(draw_date: str, slots: list[dict] | None = None) -> bool:
+    slots = slots or DRAW_TIMES
+    for slot in slots:
+        for pid in CAJA_PROVINCES:
+            if not _get_draw_row(draw_date, slot["id"], pid):
+                return True
+    return False
+
+
+def _ensure_session_draws() -> None:
+    """Fusiona seed si faltan sorteos en hoy o en dias de descanso de la sesion."""
     today = today_local()
     now = now_local()
     past_slots = [slot for slot in DRAW_TIMES if now >= draw_datetime_local(slot)]
-    if not past_slots:
-        return
-    missing = False
-    for slot in past_slots:
-        for pid in CAJA_PROVINCES:
-            row = next(
-                (
-                    d
-                    for d in get_draws(province=pid, from_date=today)
-                    if d["draw_date"] == today
-                    and d["draw_type"] == slot["id"]
-                    and d["position"] == 1
-                ),
-                None,
-            )
-            if not row:
-                missing = True
-                break
-        if missing:
-            break
-    if missing:
+    if past_slots and _date_draws_missing(today, past_slots):
         from backend.seed.loader import merge_seed_draws
 
         merge_seed_draws()
+        return
+
+    start = datetime.fromisoformat(CAJA_SESSION_START).date()
+    end = datetime.fromisoformat(today).date()
+    day = start
+    while day <= end:
+        ds = day.isoformat()
+        if is_rest_day(ds) and _date_draws_missing(ds):
+            from backend.seed.loader import merge_seed_draws
+
+            merge_seed_draws()
+            return
+        day += timedelta(days=1)
+
+
+def _ensure_today_draws() -> None:
+    _ensure_session_draws()
 
 
 def _rest_day_movements(draw_date: str, entries: list[dict]) -> list[dict[str, Any]]:
@@ -135,16 +154,7 @@ def _rest_day_movements(draw_date: str, entries: list[dict]) -> list[dict[str, A
     items: list[dict[str, Any]] = []
     for slot in DRAW_TIMES:
         for pid in CAJA_PROVINCES:
-            row = next(
-                (
-                    d
-                    for d in get_draws(province=pid, from_date=draw_date)
-                    if d["draw_date"] == draw_date
-                    and d["draw_type"] == slot["id"]
-                    and d["position"] == 1
-                ),
-                None,
-            )
+            row = _get_draw_row(draw_date, slot["id"], pid)
             digit = _province_active_digit(pid)
             state = _replay_province_state(pid, entries)
             result_digit = int(row["last_digit"]) if row else None
