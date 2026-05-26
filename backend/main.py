@@ -162,6 +162,25 @@ def api_dashboard():
     return dashboard_summary()
 
 
+@app.post("/api/cron-sync")
+def api_cron_sync():
+    """Sync externo (cron-job.org) — requiere clave. Respaldo si GitHub Actions no corre."""
+    result = sync_all_provinces(HISTORY_DAYS)
+    if result.get("total_records_upserted", 0) == 0:
+        from backend.seed.loader import merge_seed_draws
+
+        merge_seed_draws()
+    resolve_predictions()
+    maybe_sync_after_draw(force=True)
+    betting = process_new_results()
+    return {
+        "sync": result,
+        "betting": betting,
+        "draw_sync": get_draw_sync_status(),
+        "state": get_caja_state(),
+    }
+
+
 @app.post("/api/sync")
 def api_sync(
     days: int = Query(default=HISTORY_DAYS, ge=1, le=60),

@@ -41,6 +41,7 @@ from backend.database import (
     upsert_betting_slot,
 )
 from backend.rest_days import (
+    effective_holiday_dates,
     is_rest_day,
     is_today_rest_day,
     rest_day_kind,
@@ -506,7 +507,7 @@ def _purge_invalid_caja_entries() -> int:
     n1 = purge_betting_entries_before_session(CAJA_SESSION_START, CAJA_PROVINCES)
     n2 = purge_betting_entries_excluded_draws(CAJA_SESSION_START, excluded, CAJA_PROVINCES)
     n3 = purge_betting_entries_on_weekdays(rest_weekdays_to_purge(), CAJA_PROVINCES)
-    n4 = purge_betting_entries_on_dates(list(CAJA_HOLIDAYS.keys()), CAJA_PROVINCES)
+    n4 = purge_betting_entries_on_dates(effective_holiday_dates(), CAJA_PROVINCES)
     return n1 + n2 + n3 + n4
 
 
