@@ -395,6 +395,19 @@ function renderCaja(state) {
   if (satRest) satRest.checked = satOn;
   if (satRestAdv) satRestAdv.checked = satOn;
 
+  if ($("cajaSyncNote") && state.session?.auto_sync) {
+    const a = state.session.auto_sync;
+    const pending = (a.draws_today || []).filter(
+      (d) => d.phase === "waiting_sync" || d.phase === "awaiting_result"
+    );
+    if (pending.length) {
+      const names = pending.map((d) => d.draw_name).join(", ");
+      $("cajaSyncNote").innerHTML = `Buscando sorteos de hoy (${names}) cada ${a.every_minutes} min hasta 1 h post-sorteo. <strong>Auto</strong> activado arriba.`;
+    } else {
+      $("cajaSyncNote").textContent = `Sorteos de hoy al dia. Auto cada ${a.every_minutes} min post-sorteo (ventana ${a.window_minutes} min).`;
+    }
+  }
+
   renderActiveBets(state.active_bets);
 
   const entries = state.entries || [];

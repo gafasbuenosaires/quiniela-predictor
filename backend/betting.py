@@ -19,6 +19,8 @@ from backend.config import (
     DEFAULT_PROVINCE,
     DRAW_TIMES,
     PAYOUT_MULTIPLIER,
+    POST_DRAW_SYNC_MINUTES,
+    POST_DRAW_SYNC_WINDOW_MINUTES,
     PROVINCES,
 )
 from backend.database import (
@@ -509,6 +511,14 @@ def _purge_invalid_caja_entries() -> int:
 
 
 def get_caja_state(limit: int = 50) -> dict[str, Any]:
+    """Estado caja — intenta sync automatico de sorteos antes de armar el ledger."""
+    try:
+        from backend.draw_sync import maybe_sync_after_draw
+
+        maybe_sync_after_draw(force=False)
+    except Exception:
+        pass
+    _ensure_session_draws()
     apply_session_bets()
     _purge_invalid_caja_entries()
     settings = get_settings()
@@ -521,7 +531,7 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
     process_new_results()
     today = today_local()
     rest_today = is_today_rest_day()
-    _ensure_today_draws()
+    _ensure_session_draws()
     real_entries = get_betting_entries_filtered(
         provinces=CAJA_PROVINCES,
         limit=limit,
@@ -544,6 +554,12 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             by_province[p][k] = round(by_province[p][k], 2)
 
     draw = DRAW_INFO.get(CAJA_DRAW, DRAW_TIMES[1])
+    try:
+        from backend.draw_sync import get_draw_sync_status
+
+        draw_sync = get_draw_sync_status()
+    except Exception:
+        draw_sync = []
     return {
         "settings": settings,
         "session": {
@@ -556,6 +572,12 @@ def get_caja_state(limit: int = 50) -> dict[str, Any]:
             "rest_day": rest_today,
             "rest_kind": today_rest_kind() if rest_today else None,
             "rest_label": rest_day_label(today) if rest_today else "",
+            "auto_sync": {
+                "enabled": True,
+                "every_minutes": POST_DRAW_SYNC_MINUTES,
+                "window_minutes": POST_DRAW_SYNC_WINDOW_MINUTES,
+                "draws_today": draw_sync,
+            },
         },
         "caja": {
             **totals,
